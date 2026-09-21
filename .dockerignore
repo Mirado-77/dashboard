@@ -1,0 +1,9 @@
+**/node_modules
+**/dist
+**/.next
+**/.env
+**/*.tsbuildinfo
+.git
+bootstrap
+subject
+.claude
