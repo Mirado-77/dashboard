@@ -1,0 +1,15 @@
+{
+  "$schema": "https://philcn.dev/schema.json",
+  "style": "default",
+  "tsx": true,
+  "tailwind": {
+    "css": "src/styles/philcn.css",
+    "baseColor": "neutral"
+  },
+  "aliases": {
+    "components": "@/components",
+    "ui": "@/components/ui",
+    "lib": "@/lib",
+    "philcn": "@/lib/philcn"
+  }
+}
