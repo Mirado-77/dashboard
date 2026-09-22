@@ -5,7 +5,11 @@ import {
   isTrustedOrigin,
   type AuthContext,
 } from './context.js';
-import { matchPath, type AuthEndpoint, type EndpointContext } from './endpoint.js';
+import {
+  matchPath,
+  type AuthEndpoint,
+  type EndpointContext,
+} from './endpoint.js';
 import {
   sendVerificationEmail,
   verifyEmail,
@@ -26,22 +30,32 @@ import { AuthError, Errors } from './errors.js';
 import type { AuthOptions } from './options.js';
 import type { HookContext } from './plugin.js';
 import { memoryRateLimiter } from './rate-limit.js';
+import {
+  requestPasswordReset,
+  resetPassword,
+} from './endpoints/password-reset.js';
 
 function coreEndpoints(options: AuthOptions): AuthEndpoint<any>[] {
   const endpoints: AuthEndpoint<any>[] = [getSession, signOut, updateUser];
-  if (options.emailAndPassword?.enabled) endpoints.push(signUpEmail, signInEmail, updatePassword);
-  if (options.emailVerification) endpoints.push(sendVerificationEmail, verifyEmail);
+  if (options.emailAndPassword?.enabled)
+    endpoints.push(signUpEmail, signInEmail, updatePassword);
+  if (options.emailVerification)
+    endpoints.push(sendVerificationEmail, verifyEmail);
   endpoints.push(listProviders, listAccounts, unlinkAccount);
   if (options.socialProviders?.length) {
     endpoints.push(signInSocial, linkSocial, oauthCallback);
   }
+  if (options.emailResetPassword)
+    endpoints.push(requestPasswordReset, resetPassword);
   return endpoints;
 }
 
 function assertTrustedOrigin(auth: AuthContext, request: Request) {
   const origin =
     request.headers.get('origin') ??
-    (request.headers.get('referer') ? new URL(request.headers.get('referer')!).origin : null);
+    (request.headers.get('referer')
+      ? new URL(request.headers.get('referer')!).origin
+      : null);
   // Requests without cookie nor origin (server to server) carry no CSRF risk.
   if (!origin && !request.headers.has('cookie')) return;
   if (!origin || !isTrustedOrigin(auth, origin)) throw Errors.untrustedOrigin();
@@ -51,7 +65,11 @@ async function readBody(request: Request): Promise<unknown> {
   const text = await request.text();
   if (!text) return {};
   if (!request.headers.get('content-type')?.includes('application/json')) {
-    throw new AuthError(415, 'UNSUPPORTED_MEDIA_TYPE', 'Expected application/json');
+    throw new AuthError(
+      415,
+      'UNSUPPORTED_MEDIA_TYPE',
+      'Expected application/json',
+    );
   }
   try {
     return JSON.parse(text);
@@ -68,8 +86,14 @@ export function createAuth(options: AuthOptions): AuthInstance {
     ...coreEndpoints(options),
     ...plugins.flatMap((plugin) => plugin.endpoints ?? []),
   ]) {
-    if (routes.some((r) => r.method === endpoint.method && r.path === endpoint.path)) {
-      throw new Error(`Duplicate auth endpoint: ${endpoint.method} ${endpoint.path}`);
+    if (
+      routes.some(
+        (r) => r.method === endpoint.method && r.path === endpoint.path,
+      )
+    ) {
+      throw new Error(
+        `Duplicate auth endpoint: ${endpoint.method} ${endpoint.path}`,
+      );
     }
     routes.push(endpoint);
   }
@@ -84,7 +108,12 @@ export function createAuth(options: AuthOptions): AuthInstance {
   }
   const beforeHooks = plugins.flatMap((plugin) => plugin.hooks?.before ?? []);
   const afterHooks = plugins.flatMap((plugin) => plugin.hooks?.after ?? []);
-  const rateLimit = { enabled: true, window: 60, max: 100, ...options.rateLimit };
+  const rateLimit = {
+    enabled: true,
+    window: 60,
+    max: 100,
+    ...options.rateLimit,
+  };
   const limiter = memoryRateLimiter();
 
   async function handle(request: Request): Promise<Response> {
@@ -121,7 +150,9 @@ export function createAuth(options: AuthOptions): AuthInstance {
         request.method === 'GET' ? {} : await readBody(request),
       );
       if (!parsed.success) {
-        throw Errors.invalidBody(parsed.error.issues.map((i) => i.message).join(', '));
+        throw Errors.invalidBody(
+          parsed.error.issues.map((i) => i.message).join(', '),
+        );
       }
       body = parsed.data;
     }
@@ -143,7 +174,8 @@ export function createAuth(options: AuthOptions): AuthInstance {
       body,
       auth,
       responseHeaders,
-      json: (data, status = 200) => withHeaders(Response.json(data, { status })),
+      json: (data, status = 200) =>
+        withHeaders(Response.json(data, { status })),
       redirect: (location) =>
         withHeaders(new Response(null, { status: 302, headers: { location } })),
       async requireSession() {
@@ -178,7 +210,8 @@ export function createAuth(options: AuthOptions): AuthInstance {
       async getSession({ headers }) {
         return (await auth.getSession(headers))?.data ?? null;
       },
-      getAccessToken: ({ userId, providerId }) => getAccessToken(auth, userId, providerId),
+      getAccessToken: ({ userId, providerId }) =>
+        getAccessToken(auth, userId, providerId),
     },
   };
 }

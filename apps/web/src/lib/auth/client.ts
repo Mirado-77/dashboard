@@ -77,6 +77,10 @@ export const authClient = {
   }) => request<{ success: boolean }>("/update-password", { method: "POST", body }),
   signOut: () => request<{ success: boolean }>("/sign-out", { method: "POST" }),
   getSession: () => request<Session | null>("/get-session"),
+  requestPasswordReset: (body: { email: string; callbackURL?: string }) =>
+    request<{ status: boolean }>("/request-password-reset", { method: "POST", body }),
+  resetPassword: (body: { token: string; newPassword: string }) =>
+    request<{ status: boolean }>("/reset-password", { method: "POST", body }),
   sendVerificationEmail: (body: { email: string; callbackURL?: string }) =>
     request<{ status: boolean }>("/send-verification-email", {
       method: "POST",

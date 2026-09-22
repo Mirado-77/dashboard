@@ -37,6 +37,14 @@ export interface AuthOptions {
     /** Token lifetime in seconds. */
     expiresIn?: number;
   };
+  emailResetPassword?: {
+    sendResetPassword(data: {
+      user: AuthUser;
+      url: string;
+      token: string;
+    }): Promise<void>;
+    expiresIn?: number;
+  };
   socialProviders?: OAuthProvider[];
   accountLinking?: {
     /** Link a provider account to an existing user with the same email. */

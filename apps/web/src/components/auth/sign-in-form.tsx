@@ -59,6 +59,9 @@ export function SignInForm({ next }: { next: string }) {
         </div>
         <FormError message={error} />
         <SubmitButton pending={pending}>Sign in</SubmitButton>
+        <Button variant="link" size="sm" className="h-auto self-start px-0" asChild>
+          <Link href="/forgot-password">Forgot your password?</Link>
+        </Button>
       </form>
       {unverifiedEmail && <ResendVerification email={unverifiedEmail} />}
       <p className="text-sm text-muted-foreground">
