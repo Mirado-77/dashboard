@@ -28,7 +28,6 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
             {user.image && <AvatarImage src={user.image} alt="" />}
             <AvatarFallback>{user.name.slice(0, 2).toUpperCase()}</AvatarFallback>
           </Avatar>
-          <span className="text-sm">{user.name}</span>
           <SignOutButton />
         </div>
       </header>
