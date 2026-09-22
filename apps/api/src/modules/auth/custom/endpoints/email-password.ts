@@ -14,10 +14,18 @@ export function assertPasswordLength(auth: AuthContext, password: string) {
   const min = config?.minPasswordLength ?? 8;
   const max = config?.maxPasswordLength ?? 128;
   if (password.length < min) {
-    throw new AuthError(400, 'PASSWORD_TOO_SHORT', `Password must be at least ${min} characters`);
+    throw new AuthError(
+      400,
+      'PASSWORD_TOO_SHORT',
+      `Password must be at least ${min} characters`,
+    );
   }
   if (password.length > max) {
-    throw new AuthError(400, 'PASSWORD_TOO_LONG', `Password must be at most ${max} characters`);
+    throw new AuthError(
+      400,
+      'PASSWORD_TOO_LONG',
+      `Password must be at most ${max} characters`,
+    );
   }
 }
 
@@ -73,7 +81,10 @@ export const signUpEmail = defineEndpoint({
     if (auth.options.emailAndPassword?.requireEmailVerification) {
       return json({ user, token: null });
     }
-    responseHeaders.append('set-cookie', await auth.createSession(user, request));
+    responseHeaders.append(
+      'set-cookie',
+      await auth.createSession(user, request),
+    );
     return json({ user });
   },
 });
@@ -104,7 +115,10 @@ export const signInEmail = defineEndpoint({
       throw Errors.invalidCredentials();
     }
 
-    if (auth.options.emailAndPassword?.requireEmailVerification && !user.emailVerified) {
+    if (
+      auth.options.emailAndPassword?.requireEmailVerification &&
+      !user.emailVerified
+    ) {
       if (auth.options.emailVerification?.sendOnSignIn) {
         await auth.sendVerificationEmail(user, body.callbackURL);
       }
@@ -115,6 +129,10 @@ export const signInEmail = defineEndpoint({
       'set-cookie',
       await auth.createSession(user, request, body.rememberMe ?? true),
     );
-    return json({ user, redirect: Boolean(body.callbackURL), url: body.callbackURL ?? null });
+    return json({
+      user,
+      redirect: Boolean(body.callbackURL),
+      url: body.callbackURL ?? null,
+    });
   },
 });

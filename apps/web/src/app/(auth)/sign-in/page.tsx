@@ -11,7 +11,7 @@ import { safeRedirect } from "@/lib/safe-redirect";
 export const metadata: Metadata = { title: "Sign in" };
 
 export default async function SignInPage({ searchParams }: PageProps<"/sign-in">) {
-  const { next, error } = await searchParams;
+  const { next, error, reset } = await searchParams;
   const target = safeRedirect(typeof next === "string" ? next : null);
   if (await getSession()) redirect(target);
   const message = authErrorMessage(error);
@@ -21,6 +21,11 @@ export default async function SignInPage({ searchParams }: PageProps<"/sign-in">
       {message && (
         <Alert variant="destructive" role="alert">
           <AlertDescription>{message}</AlertDescription>
+        </Alert>
+      )}
+      {reset && (
+        <Alert role="status">
+          <AlertDescription>Your password was changed, sign in with the new one.</AlertDescription>
         </Alert>
       )}
       <SocialButtons providers={await getProviders()} next={target} />

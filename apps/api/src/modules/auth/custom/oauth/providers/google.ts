@@ -28,10 +28,14 @@ export function google(options: {
       prompt: 'consent',
     },
     async getUserInfo({ accessToken }) {
-      const response = await fetch('https://openidconnect.googleapis.com/v1/userinfo', {
-        headers: { authorization: `Bearer ${accessToken}` },
-      });
-      if (!response.ok) throw new Error(`Google userinfo request failed: ${response.status}`);
+      const response = await fetch(
+        'https://openidconnect.googleapis.com/v1/userinfo',
+        {
+          headers: { authorization: `Bearer ${accessToken}` },
+        },
+      );
+      if (!response.ok)
+        throw new Error(`Google userinfo request failed: ${response.status}`);
       const info = (await response.json()) as GoogleUserInfo;
       return {
         id: info.sub,

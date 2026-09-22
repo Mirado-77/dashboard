@@ -31,11 +31,16 @@ export const verifyEmail = defineEndpoint({
     try {
       if (!token) throw Errors.invalidToken();
       const userId = await auth.consumeVerificationToken(token);
-      const user = await auth.store.users.update(userId, { emailVerified: true });
+      const user = await auth.store.users.update(userId, {
+        emailVerified: true,
+      });
       if (!user) throw Errors.invalidToken();
 
       if (auth.options.emailVerification?.autoSignInAfterVerification) {
-        responseHeaders.append('set-cookie', await auth.createSession(user, request));
+        responseHeaders.append(
+          'set-cookie',
+          await auth.createSession(user, request),
+        );
       }
       return callbackURL ? redirect(callbackURL) : json({ status: true, user });
     } catch (error) {

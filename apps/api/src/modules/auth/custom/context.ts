@@ -17,6 +17,7 @@ const DAY = 60 * 60 * 24;
 
 export const CREDENTIAL_PROVIDER = 'credential';
 const EMAIL_VERIFICATION_PREFIX = 'email-verification:';
+const EMAIL_RESET_PASSWORD_PREFIX = 'email-reset-password';
 
 export interface AuthContext {
   options: AuthOptions;
@@ -43,8 +44,10 @@ export interface AuthContext {
   deleteSession(headers: Headers): Promise<void>;
   clearSessionCookie(): string;
   sendVerificationEmail(user: AuthUser, callbackURL?: string): Promise<void>;
+  sendResetPassword(user: AuthUser, callbackURL?: string): Promise<void>;
   /** Consumes a verification token and returns the linked user id. */
   consumeVerificationToken(token: string): Promise<string>;
+  consumeResetPasswordToken(token: string): Promise<string>;
   assertCallbackURL(url: string | undefined): void;
 }
 
@@ -89,7 +92,8 @@ export function createContext(options: AuthOptions): AuthContext {
     logger: options.logger ?? console,
     sessionCookieName: cookieName,
     cookieName: (name) => `${cookiePrefix}.${name}`,
-    cookie: (name, value, maxAge) => cookie(value, maxAge, `${cookiePrefix}.${name}`),
+    cookie: (name, value, maxAge) =>
+      cookie(value, maxAge, `${cookiePrefix}.${name}`),
 
     async createSession(initialUser, request, rememberMe = true) {
       let user = initialUser;
@@ -160,10 +164,44 @@ export function createContext(options: AuthOptions): AuthContext {
       await config.sendVerificationEmail({ user, url: url.toString(), token });
     },
 
+    async sendResetPassword(user, callbackURL) {
+      const config = options.emailResetPassword;
+      if (!config) return;
+      const token = generateToken();
+      await store.verifications.create({
+        id: generateId(),
+        identifier: `${EMAIL_RESET_PASSWORD_PREFIX}${sha256(token)}`,
+        value: user.id,
+        expiresAt: new Date(Date.now() + (config.expiresIn ?? 3600) * 1000),
+      });
+
+      const url = new URL(
+        callbackURL ?? '/reset-password',
+        new URL(options.baseURL).origin,
+      );
+      url.searchParams.set('token', token);
+
+      await config.sendResetPassword({ user, url: url.toString(), token });
+    },
+
     async consumeVerificationToken(token) {
       const identifier = `${EMAIL_VERIFICATION_PREFIX}${sha256(token)}`;
-      const verification = await store.verifications.findByIdentifier(identifier);
+      const verification =
+        await store.verifications.findByIdentifier(identifier);
       if (!verification) throw Errors.invalidToken();
+      await store.verifications.deleteById(verification.id);
+      if (verification.expiresAt.getTime() <= Date.now()) {
+        throw Errors.invalidToken();
+      }
+      return verification.value;
+    },
+
+    async consumeResetPasswordToken(token) {
+      const identifier = `${EMAIL_RESET_PASSWORD_PREFIX}${sha256(token)}`;
+      const verification =
+        await store.verifications.findByIdentifier(identifier);
+      if (!verification) throw Errors.invalidToken();
+
       await store.verifications.deleteById(verification.id);
       if (verification.expiresAt.getTime() <= Date.now()) {
         throw Errors.invalidToken();
@@ -174,7 +212,11 @@ export function createContext(options: AuthOptions): AuthContext {
     assertCallbackURL(url) {
       if (url === undefined) return;
       // Relative paths only, "//host" would be protocol-relative.
-      if (url.startsWith('/') && !url.startsWith('//') && !url.startsWith('/\\')) {
+      if (
+        url.startsWith('/') &&
+        !url.startsWith('//') &&
+        !url.startsWith('/\\')
+      ) {
         return;
       }
       try {

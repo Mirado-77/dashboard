@@ -48,7 +48,9 @@ export const authFactory = {
       store: drizzleStore(db),
       socialProviders: socialProviders(config),
       errorURL: '/sign-in',
-      plugins: [admin({ adminEmails: config.get('ADMIN_EMAILS', { infer: true }) })],
+      plugins: [
+        admin({ adminEmails: config.get('ADMIN_EMAILS', { infer: true }) }),
+      ],
       emailAndPassword: {
         enabled: true,
         requireEmailVerification: true,
@@ -65,6 +67,15 @@ export const authFactory = {
           });
         },
       },
+      emailResetPassword: {
+        async sendResetPassword({ user, url }) {
+          await mail.send({
+            to: user.email,
+            subject: 'Reset Pasword Link',
+            text: `Hello ${user.name},\n\nHere is you reset password link : ${url}\n\nThis link expires in one hour.`,
+          });
+        },
+      },
       rateLimit: {
         window: 60,
         max: 100,
@@ -73,7 +84,9 @@ export const authFactory = {
           '/sign-up/email': { window: 60, max: 5 },
           '/send-verification-email': { window: 60, max: 3 },
           '/sign-in/social': { window: 60, max: 10 },
-          '/update-password': {window: 60, max: 5},
+          '/update-password': { window: 60, max: 5 },
+          '/request-password-reset': { window: 60, max: 3 },
+          '/reset-password': { window: 60, max: 5 },
         },
       },
     });

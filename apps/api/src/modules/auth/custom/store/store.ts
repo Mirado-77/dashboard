@@ -56,8 +56,14 @@ export interface AuthStore {
   };
   accounts: {
     create(data: NewAccount): Promise<AccountRecord>;
-    findByUser(userId: string, providerId: string): Promise<AccountRecord | null>;
-    findByProvider(providerId: string, accountId: string): Promise<AccountRecord | null>;
+    findByUser(
+      userId: string,
+      providerId: string,
+    ): Promise<AccountRecord | null>;
+    findByProvider(
+      providerId: string,
+      accountId: string,
+    ): Promise<AccountRecord | null>;
     listByUser(userId: string): Promise<AccountRecord[]>;
     update(id: string, patch: Patch<AccountRecord>): Promise<void>;
     delete(id: string): Promise<void>;

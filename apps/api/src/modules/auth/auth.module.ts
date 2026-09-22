@@ -1,4 +1,9 @@
-import { Global, Module, type DynamicModule, type ModuleMetadata } from '@nestjs/common';
+import {
+  Global,
+  Module,
+  type DynamicModule,
+  type ModuleMetadata,
+} from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { AUTH_INSTANCE, type AuthInstance } from './auth.contract.js';
 import { AuthController } from './auth.controller.js';
