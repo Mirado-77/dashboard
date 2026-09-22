@@ -1,6 +1,6 @@
 "use client";
 
-import { LogOut, Link2 } from "lucide-react";
+import { LogOut, Link2, UserRound } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -45,6 +45,12 @@ export function UserMenu({ user }: { user: Pick<User, "name" | "email" | "image"
           <span className="truncate text-xs font-normal text-muted-foreground">{user.email}</span>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
+        <DropdownMenuItem asChild>
+          <Link href="/settings/profile">
+            <UserRound />
+            Profile
+          </Link>
+        </DropdownMenuItem>
         <DropdownMenuItem asChild>
           <Link href="/settings/accounts">
             <Link2 />

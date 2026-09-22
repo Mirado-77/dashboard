@@ -68,6 +68,7 @@ export interface AuthStore {
     update(id: string, patch: Patch<AuthSessionRecord>): Promise<void>;
     deleteByTokenHash(tokenHash: string): Promise<void>;
     deleteByUser(userId: string): Promise<void>;
+    deleteByUserExcept(userId: string, sessionId: string): Promise<void>;
   };
   verifications: {
     create(data: NewVerification): Promise<VerificationRecord>;

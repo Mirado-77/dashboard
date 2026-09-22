@@ -1,4 +1,4 @@
-import { and, count, desc, eq, ilike, or } from 'drizzle-orm';
+import { and, count, desc, eq, ilike, not, or } from 'drizzle-orm';
 import type { Database } from '../../../../database/database.module.js';
 import {
   accounts,
@@ -135,6 +135,9 @@ export function drizzleStore(db: Executor): AuthStore {
       },
       async deleteByUser(userId) {
         await db.delete(sessions).where(eq(sessions.userId, userId));
+      },
+      async deleteByUserExcept(userId, sessionId) {
+          await db.delete(sessions).where(and(eq(sessions.userId, userId), not(eq(sessions.id, sessionId))))
       },
     },
     verifications: {

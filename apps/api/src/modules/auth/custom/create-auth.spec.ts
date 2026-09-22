@@ -160,6 +160,129 @@ describe('createAuth', () => {
     expect((await post(auth, '/sign-up/email', credentials)).status).toBe(418);
   });
 
+  it('updates the name of the caller only', async () => {
+    const { auth, mails } = setup();
+    await signUpAndVerify(auth, mails);
+    const cookie = cookieOf(await post(auth, '/sign-in/email', credentials));
+
+    const response = await post(auth, '/update-user', { name: '  Morty  ' }, { cookie });
+    expect(response.status).toBe(200);
+    expect((await response.json()).user.name).toBe('Morty');
+
+    const session = await auth.api.getSession({ headers: new Headers({ cookie }) });
+    expect(session?.user.name).toBe('Morty');
+  });
+
+  it('rejects a name update without session or with an empty name', async () => {
+    const { auth, mails } = setup();
+    await signUpAndVerify(auth, mails);
+    const cookie = cookieOf(await post(auth, '/sign-in/email', credentials));
+
+    expect((await post(auth, '/update-user', { name: 'Morty' })).status).toBe(401);
+    expect((await post(auth, '/update-user', { name: '   ' }, { cookie })).status).toBe(400);
+  });
+
+  it('changes the password and signs in with the new one', async () => {
+    const { auth, mails } = setup();
+    await signUpAndVerify(auth, mails);
+    const cookie = cookieOf(await post(auth, '/sign-in/email', credentials));
+    const newPassword = 'pickle-rick-99';
+
+    const response = await post(
+      auth,
+      '/update-password',
+      { currentPassword: credentials.password, newPassword },
+      { cookie },
+    );
+    expect(response.status).toBe(200);
+
+    expect((await post(auth, '/sign-in/email', credentials)).status).toBe(401);
+    expect(
+      (await post(auth, '/sign-in/email', { ...credentials, password: newPassword })).status,
+    ).toBe(200);
+  });
+
+  it('refuses a wrong current password and a too short new one', async () => {
+    const { auth, mails } = setup();
+    await signUpAndVerify(auth, mails);
+    const cookie = cookieOf(await post(auth, '/sign-in/email', credentials));
+
+    const wrong = await post(
+      auth,
+      '/update-password',
+      { currentPassword: 'not-my-password', newPassword: 'pickle-rick-99' },
+      { cookie },
+    );
+    expect(wrong.status).toBe(401);
+
+    const short = await post(
+      auth,
+      '/update-password',
+      { currentPassword: credentials.password, newPassword: '123' },
+      { cookie },
+    );
+    expect(short.status).toBe(400);
+    expect((await short.json()).code).toBe('PASSWORD_TOO_SHORT');
+
+    // The password still works, nothing was changed.
+    expect((await post(auth, '/sign-in/email', credentials)).status).toBe(200);
+  });
+
+  it('requires a session to change the password', async () => {
+    const { auth, mails } = setup();
+    await signUpAndVerify(auth, mails);
+
+    const response = await post(auth, '/update-password', {
+      currentPassword: credentials.password,
+      newPassword: 'pickle-rick-99',
+    });
+    expect(response.status).toBe(401);
+  });
+
+  it('revokes the other sessions but keeps the caller signed in', async () => {
+    const { auth, mails } = setup();
+    await signUpAndVerify(auth, mails);
+    const otherDevice = cookieOf(await post(auth, '/sign-in/email', credentials));
+    const cookie = cookieOf(await post(auth, '/sign-in/email', credentials));
+
+    const response = await post(
+      auth,
+      '/update-password',
+      {
+        currentPassword: credentials.password,
+        newPassword: 'pickle-rick-99',
+        revokeOtherSessions: true,
+      },
+      { cookie },
+    );
+    expect(response.status).toBe(200);
+
+    expect(await auth.api.getSession({ headers: new Headers({ cookie: otherDevice }) })).toBeNull();
+    // The endpoint may refresh the cookie, so read the session from the latest one.
+    const current = response.headers.getSetCookie()[0]
+      ? cookieOf(response)
+      : cookie;
+    expect(await auth.api.getSession({ headers: new Headers({ cookie: current }) })).not.toBeNull();
+  });
+
+  it('keeps the other sessions when the option is not set', async () => {
+    const { auth, mails } = setup();
+    await signUpAndVerify(auth, mails);
+    const otherDevice = cookieOf(await post(auth, '/sign-in/email', credentials));
+    const cookie = cookieOf(await post(auth, '/sign-in/email', credentials));
+
+    await post(
+      auth,
+      '/update-password',
+      { currentPassword: credentials.password, newPassword: 'pickle-rick-99' },
+      { cookie },
+    );
+
+    expect(
+      await auth.api.getSession({ headers: new Headers({ cookie: otherDevice }) }),
+    ).not.toBeNull();
+  });
+
   it('returns 404 for unknown routes', async () => {
     const { auth } = setup();
     expect((await auth.handler(new Request(`${BASE}/nope`))).status).toBe(404);
