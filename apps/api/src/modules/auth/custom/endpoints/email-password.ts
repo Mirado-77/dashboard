@@ -9,7 +9,7 @@ const email = z.email().trim().toLowerCase();
 // Hash compared when the user does not exist, so both paths take the same time.
 let dummyHash: Promise<string> | undefined;
 
-function assertPasswordLength(auth: AuthContext, password: string) {
+export function assertPasswordLength(auth: AuthContext, password: string) {
   const config = auth.options.emailAndPassword;
   const min = config?.minPasswordLength ?? 8;
   const max = config?.maxPasswordLength ?? 128;

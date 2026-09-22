@@ -122,6 +122,13 @@ export function memoryStore(): AuthStore {
           if (s.userId === userId) sessions.delete(id);
         }
       },
+      async deleteByUserExcept(userId, sessionId) {
+        for (const [id, s] of sessions) {
+            if ((s.userId === userId) && (s.id !== sessionId)) {
+                sessions.delete(id);
+            }
+        }
+      },
     },
     verifications: {
       async create(data) {

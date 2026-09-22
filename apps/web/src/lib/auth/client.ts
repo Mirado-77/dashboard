@@ -68,6 +68,13 @@ export const authClient = {
     redirectTo(await request<{ url: string }>("/link-social", { method: "POST", body })),
   unlinkAccount: (body: { providerId: string }) =>
     request<{ status: boolean }>("/unlink-account", { method: "POST", body }),
+  updateUser: (body: { name: string }) =>
+    request<{ user: User }>("/update-user", { method: "POST", body }),
+  changePassword: (body: {
+    currentPassword: string;
+    newPassword: string;
+    revokeOtherSessions?: boolean;
+  }) => request<{ success: boolean }>("/update-password", { method: "POST", body }),
   signOut: () => request<{ success: boolean }>("/sign-out", { method: "POST" }),
   getSession: () => request<Session | null>("/get-session"),
   sendVerificationEmail: (body: { email: string; callbackURL?: string }) =>

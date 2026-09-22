@@ -73,6 +73,7 @@ export const authFactory = {
           '/sign-up/email': { window: 60, max: 5 },
           '/send-verification-email': { window: 60, max: 3 },
           '/sign-in/social': { window: 60, max: 10 },
+          '/update-password': {window: 60, max: 5},
         },
       },
     });

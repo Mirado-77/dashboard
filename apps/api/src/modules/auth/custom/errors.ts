@@ -41,4 +41,6 @@ export const Errors = {
   forbidden: () => new AuthError(403, 'FORBIDDEN', 'Forbidden'),
   userBanned: () =>
     new AuthError(403, 'USER_BANNED', 'This account has been suspended'),
+  accountHasNoPassword: () =>
+    new AuthError(422, 'ACCOUNT_HAS_NO_PASSWORD', 'This account has no password'),
 };

@@ -12,6 +12,7 @@ import {
 } from './endpoints/email-verification.js';
 import { signInEmail, signUpEmail } from './endpoints/email-password.js';
 import { getSession, signOut } from './endpoints/session.js';
+import { updatePassword, updateUser } from './endpoints/user.js';
 import {
   linkSocial,
   listAccounts,
@@ -27,8 +28,8 @@ import type { HookContext } from './plugin.js';
 import { memoryRateLimiter } from './rate-limit.js';
 
 function coreEndpoints(options: AuthOptions): AuthEndpoint<any>[] {
-  const endpoints: AuthEndpoint<any>[] = [getSession, signOut];
-  if (options.emailAndPassword?.enabled) endpoints.push(signUpEmail, signInEmail);
+  const endpoints: AuthEndpoint<any>[] = [getSession, signOut, updateUser];
+  if (options.emailAndPassword?.enabled) endpoints.push(signUpEmail, signInEmail, updatePassword);
   if (options.emailVerification) endpoints.push(sendVerificationEmail, verifyEmail);
   endpoints.push(listProviders, listAccounts, unlinkAccount);
   if (options.socialProviders?.length) {
