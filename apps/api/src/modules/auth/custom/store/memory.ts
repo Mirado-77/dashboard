@@ -50,15 +50,19 @@ export function memoryStore(): AuthStore {
       },
       async delete(id) {
         users.delete(id);
-        for (const [key, a] of accounts) if (a.userId === id) accounts.delete(key);
-        for (const [key, s] of sessions) if (s.userId === id) sessions.delete(key);
+        for (const [key, a] of accounts)
+          if (a.userId === id) accounts.delete(key);
+        for (const [key, s] of sessions)
+          if (s.userId === id) sessions.delete(key);
       },
     },
     accounts: {
       async create(data) {
         if (
           [...accounts.values()].some(
-            (a) => a.providerId === data.providerId && a.accountId === data.accountId,
+            (a) =>
+              a.providerId === data.providerId &&
+              a.accountId === data.accountId,
           )
         ) {
           throw new Error('unique violation: account.provider_account');
@@ -124,9 +128,9 @@ export function memoryStore(): AuthStore {
       },
       async deleteByUserExcept(userId, sessionId) {
         for (const [id, s] of sessions) {
-            if ((s.userId === userId) && (s.id !== sessionId)) {
-                sessions.delete(id);
-            }
+          if (s.userId === userId && s.id !== sessionId) {
+            sessions.delete(id);
+          }
         }
       },
     },

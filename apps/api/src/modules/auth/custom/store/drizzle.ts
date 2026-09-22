@@ -9,11 +9,10 @@ import {
 import type { AuthSessionRecord } from '../../auth.contract.js';
 import type { AuthStore } from './store.js';
 
-type Executor = Database | Parameters<Parameters<Database['transaction']>[0]>[0];
+type Executor =
+  Database | Parameters<Parameters<Database['transaction']>[0]>[0];
 
-function toSessionRecord(
-  row: typeof sessions.$inferSelect,
-): AuthSessionRecord {
+function toSessionRecord(row: typeof sessions.$inferSelect): AuthSessionRecord {
   const { tokenHash: _tokenHash, ...session } = row;
   return session;
 }
@@ -47,7 +46,9 @@ export function drizzleStore(db: Executor): AuthStore {
         return user ?? null;
       },
       async list({ search, limit, offset }) {
-        const pattern = search ? `%${search.replace(/[\\%_]/g, '\\$&')}%` : null;
+        const pattern = search
+          ? `%${search.replace(/[\\%_]/g, '\\$&')}%`
+          : null;
         const where = pattern
           ? or(ilike(users.email, pattern), ilike(users.name, pattern))
           : undefined;
@@ -137,7 +138,11 @@ export function drizzleStore(db: Executor): AuthStore {
         await db.delete(sessions).where(eq(sessions.userId, userId));
       },
       async deleteByUserExcept(userId, sessionId) {
-          await db.delete(sessions).where(and(eq(sessions.userId, userId), not(eq(sessions.id, sessionId))))
+        await db
+          .delete(sessions)
+          .where(
+            and(eq(sessions.userId, userId), not(eq(sessions.id, sessionId))),
+          );
       },
     },
     verifications: {

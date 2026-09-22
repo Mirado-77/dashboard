@@ -73,10 +73,14 @@ function inSeconds(seconds: number | undefined): Date | null {
   return seconds ? new Date(Date.now() + seconds * 1000) : null;
 }
 
-export function createOAuth2Provider(config: OAuth2ProviderConfig): OAuthProvider {
+export function createOAuth2Provider(
+  config: OAuth2ProviderConfig,
+): OAuthProvider {
   const separator = config.scopeSeparator ?? ' ';
 
-  async function requestToken(params: Record<string, string>): Promise<OAuthTokens> {
+  async function requestToken(
+    params: Record<string, string>,
+  ): Promise<OAuthTokens> {
     const response = await fetch(config.tokenEndpoint, {
       method: 'POST',
       headers: {
@@ -123,7 +127,9 @@ export function createOAuth2Provider(config: OAuth2ProviderConfig): OAuthProvide
         url.searchParams.set('code_challenge', codeChallenge(codeVerifier));
         url.searchParams.set('code_challenge_method', 'S256');
       }
-      for (const [key, value] of Object.entries(config.authorizationParams ?? {})) {
+      for (const [key, value] of Object.entries(
+        config.authorizationParams ?? {},
+      )) {
         url.searchParams.set(key, value);
       }
       return url;
@@ -138,7 +144,10 @@ export function createOAuth2Provider(config: OAuth2ProviderConfig): OAuthProvide
     },
     getUserInfo: config.getUserInfo,
     refreshAccessToken(refreshToken) {
-      return requestToken({ grant_type: 'refresh_token', refresh_token: refreshToken });
+      return requestToken({
+        grant_type: 'refresh_token',
+        refresh_token: refreshToken,
+      });
     },
   };
 }

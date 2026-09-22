@@ -19,30 +19,32 @@ export const updateUser = defineEndpoint({
 });
 
 export const updatePassword = defineEndpoint({
-    method: 'POST',
-    path: '/update-password',
-    body: z.object({
-        currentPassword: z.string(),
-        newPassword: z.string(),
-        revokeOtherSessions: z.boolean().optional(),
-    }),
-    async handler({ body, auth, json, requireSession }) {
-        const { user, session } = await requireSession();
-        assertPasswordLength(auth, body.newPassword);
-        
-        const account = await auth.store.accounts.findByUser(user.id, CREDENTIAL_PROVIDER)
+  method: 'POST',
+  path: '/update-password',
+  body: z.object({
+    currentPassword: z.string(),
+    newPassword: z.string(),
+    revokeOtherSessions: z.boolean().optional(),
+  }),
+  async handler({ body, auth, json, requireSession }) {
+    const { user, session } = await requireSession();
+    assertPasswordLength(auth, body.newPassword);
 
-        if (!account || !account.password)
-            throw Errors.accountHasNoPassword()
+    const account = await auth.store.accounts.findByUser(
+      user.id,
+      CREDENTIAL_PROVIDER,
+    );
 
-        if (!(await auth.hasher.verify(body.currentPassword, account.password))) {
-            throw Errors.invalidCredentials();
-        }
+    if (!account || !account.password) throw Errors.accountHasNoPassword();
 
-        const passwordHash = await auth.hasher.hash(body.newPassword);
-        await auth.store.accounts.update(account.id, { password: passwordHash });
-        if (body.revokeOtherSessions)
-            await auth.store.sessions.deleteByUserExcept(user.id, session.id)
-        return json({ success: true });
+    if (!(await auth.hasher.verify(body.currentPassword, account.password))) {
+      throw Errors.invalidCredentials();
     }
-})
+
+    const passwordHash = await auth.hasher.hash(body.newPassword);
+    await auth.store.accounts.update(account.id, { password: passwordHash });
+    if (body.revokeOtherSessions)
+      await auth.store.sessions.deleteByUserExcept(user.id, session.id);
+    return json({ success: true });
+  },
+});

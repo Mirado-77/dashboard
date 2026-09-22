@@ -33,14 +33,23 @@ export function github(options: {
         accept: 'application/vnd.github+json',
         'user-agent': 'dashboard',
       };
-      const userResponse = await fetch('https://api.github.com/user', { headers });
-      if (!userResponse.ok) throw new Error(`GitHub user request failed: ${userResponse.status}`);
+      const userResponse = await fetch('https://api.github.com/user', {
+        headers,
+      });
+      if (!userResponse.ok)
+        throw new Error(`GitHub user request failed: ${userResponse.status}`);
       const user = (await userResponse.json()) as GitHubUser;
 
       // The public profile email may be empty or unverified, the emails API is authoritative.
-      const emailsResponse = await fetch('https://api.github.com/user/emails', { headers });
-      const emails = emailsResponse.ok ? ((await emailsResponse.json()) as GitHubEmail[]) : [];
-      const primary = emails.find((e) => e.primary) ?? emails.find((e) => e.email === user.email);
+      const emailsResponse = await fetch('https://api.github.com/user/emails', {
+        headers,
+      });
+      const emails = emailsResponse.ok
+        ? ((await emailsResponse.json()) as GitHubEmail[])
+        : [];
+      const primary =
+        emails.find((e) => e.primary) ??
+        emails.find((e) => e.email === user.email);
 
       return {
         id: String(user.id),

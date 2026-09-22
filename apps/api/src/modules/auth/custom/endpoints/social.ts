@@ -21,7 +21,8 @@ interface OAuthState {
   linkUserId: string | null;
 }
 
-const oauthError = (code: string, message: string) => new AuthError(400, code, message);
+const oauthError = (code: string, message: string) =>
+  new AuthError(400, code, message);
 
 function getProvider(auth: AuthContext, id: string): OAuthProvider {
   const provider = auth.options.socialProviders?.find((p) => p.id === id);
@@ -37,7 +38,10 @@ const flowBody = z.object({
   provider: z.string().min(1),
   callbackURL: z.string().optional(),
   errorCallbackURL: z.string().optional(),
-  scopes: z.array(z.string().regex(/^[\w:./-]+$/)).max(20).optional(),
+  scopes: z
+    .array(z.string().regex(/^[\w:./-]+$/))
+    .max(20)
+    .optional(),
 });
 
 async function startFlow(
@@ -47,7 +51,10 @@ async function startFlow(
   const { auth, body, json, responseHeaders } = ctx;
   const provider = getProvider(auth, body.provider);
   if (!linkUserId && provider.disableSignIn) {
-    throw oauthError('PROVIDER_SIGN_IN_DISABLED', 'This provider cannot be used to sign in');
+    throw oauthError(
+      'PROVIDER_SIGN_IN_DISABLED',
+      'This provider cannot be used to sign in',
+    );
   }
   auth.assertCallbackURL(body.callbackURL);
   auth.assertCallbackURL(body.errorCallbackURL);
@@ -68,7 +75,10 @@ async function startFlow(
     expiresAt: new Date(Date.now() + STATE_TTL * 1000),
   });
   // Binds the flow to this browser, the callback compares both values.
-  responseHeaders.append('set-cookie', auth.cookie(STATE_COOKIE, state, STATE_TTL));
+  responseHeaders.append(
+    'set-cookie',
+    auth.cookie(STATE_COOKIE, state, STATE_TTL),
+  );
 
   const url = provider.createAuthorizationURL({
     state,
@@ -110,7 +120,11 @@ export const linkSocial = defineEndpoint({
   },
 });
 
-async function consumeState(auth: AuthContext, request: Request, state: string | null) {
+async function consumeState(
+  auth: AuthContext,
+  request: Request,
+  state: string | null,
+) {
   const cookieState = parseCookies(request.headers.get('cookie')).get(
     auth.cookieName(STATE_COOKIE),
   );
@@ -136,7 +150,10 @@ async function resolveUser(
   tokenColumns: ReturnType<typeof encryptTokens>,
 ): Promise<AuthUser> {
   const store = auth.store;
-  const existingAccount = await store.accounts.findByProvider(provider.id, info.id);
+  const existingAccount = await store.accounts.findByProvider(
+    provider.id,
+    info.id,
+  );
   if (existingAccount) {
     await store.accounts.update(existingAccount.id, tokenColumns);
     const user = await store.users.findById(existingAccount.userId);
@@ -145,7 +162,10 @@ async function resolveUser(
   }
 
   if (!info.email) {
-    throw oauthError('EMAIL_NOT_FOUND', 'The provider did not share an email address');
+    throw oauthError(
+      'EMAIL_NOT_FOUND',
+      'The provider did not share an email address',
+    );
   }
   const email = info.email.toLowerCase();
   const existingUser = await store.users.findByEmail(email);
@@ -153,7 +173,8 @@ async function resolveUser(
   if (existingUser) {
     const linking = auth.options.accountLinking;
     const trusted =
-      info.emailVerified || (linking?.trustedProviders ?? []).includes(provider.id);
+      info.emailVerified ||
+      (linking?.trustedProviders ?? []).includes(provider.id);
     if (linking?.enabled === false || !trusted) {
       throw oauthError(
         'ACCOUNT_NOT_LINKED',
@@ -169,14 +190,21 @@ async function resolveUser(
         password: null,
         ...tokenColumns,
       });
-      if (existingUser.emailVerified || !info.emailVerified) return existingUser;
+      if (existingUser.emailVerified || !info.emailVerified)
+        return existingUser;
 
       // The local account never proved ownership of the email but the provider
       // did: drop its password and sessions so a squatter cannot keep access.
-      const credential = await tx.accounts.findByUser(existingUser.id, CREDENTIAL_PROVIDER);
+      const credential = await tx.accounts.findByUser(
+        existingUser.id,
+        CREDENTIAL_PROVIDER,
+      );
       if (credential) await tx.accounts.delete(credential.id);
       await tx.sessions.deleteByUser(existingUser.id);
-      return (await tx.users.update(existingUser.id, { emailVerified: true })) ?? existingUser;
+      return (
+        (await tx.users.update(existingUser.id, { emailVerified: true })) ??
+        existingUser
+      );
     });
   }
 
@@ -210,7 +238,10 @@ async function linkAccount(
   info: OAuthUserInfo,
   tokenColumns: ReturnType<typeof encryptTokens>,
 ) {
-  const existing = await auth.store.accounts.findByProvider(provider.id, info.id);
+  const existing = await auth.store.accounts.findByProvider(
+    provider.id,
+    info.id,
+  );
   if (existing && existing.userId !== userId) {
     throw oauthError(
       'ACCOUNT_ALREADY_LINKED',
@@ -265,7 +296,10 @@ export const oauthCallback = defineEndpoint({
         tokenColumns = encryptTokens(auth, tokens);
       } catch (error) {
         auth.logger.error(`[auth] ${provider.id} OAuth exchange failed`, error);
-        throw oauthError('OAUTH_FAILED', 'Could not complete the sign in with the provider');
+        throw oauthError(
+          'OAUTH_FAILED',
+          'Could not complete the sign in with the provider',
+        );
       }
 
       if (state.linkUserId) {
@@ -274,15 +308,25 @@ export const oauthCallback = defineEndpoint({
       }
 
       const user = await resolveUser(auth, provider, info, tokenColumns);
-      if (auth.options.emailAndPassword?.requireEmailVerification && !user.emailVerified) {
+      if (
+        auth.options.emailAndPassword?.requireEmailVerification &&
+        !user.emailVerified
+      ) {
         await auth.sendVerificationEmail(user, '/verify-email');
         throw Errors.emailNotVerified();
       }
-      responseHeaders.append('set-cookie', await auth.createSession(user, request));
+      responseHeaders.append(
+        'set-cookie',
+        await auth.createSession(user, request),
+      );
       return redirect(state.callbackURL);
     } catch (error) {
       if (!(error instanceof AuthError)) throw error;
-      const target = state?.errorCallbackURL ?? state?.callbackURL ?? auth.options.errorURL ?? '/';
+      const target =
+        state?.errorCallbackURL ??
+        state?.callbackURL ??
+        auth.options.errorURL ??
+        '/';
       const separator = target.includes('?') ? '&' : '?';
       return redirect(`${target}${separator}error=${error.code}`);
     }
@@ -318,10 +362,17 @@ export const unlinkAccount = defineEndpoint({
     if (!account) throw oauthError('ACCOUNT_NOT_FOUND', 'Account not found');
     const canSignIn = (providerId: string) =>
       providerId === CREDENTIAL_PROVIDER ||
-      auth.options.socialProviders?.some((p) => p.id === providerId && !p.disableSignIn);
-    const remaining = accounts.filter((a) => a.id !== account.id && canSignIn(a.providerId));
+      auth.options.socialProviders?.some(
+        (p) => p.id === providerId && !p.disableSignIn,
+      );
+    const remaining = accounts.filter(
+      (a) => a.id !== account.id && canSignIn(a.providerId),
+    );
     if (canSignIn(account.providerId) && remaining.length === 0) {
-      throw oauthError('FAILED_TO_UNLINK_LAST_ACCOUNT', 'You cannot unlink your last sign-in method');
+      throw oauthError(
+        'FAILED_TO_UNLINK_LAST_ACCOUNT',
+        'You cannot unlink your last sign-in method',
+      );
     }
     await auth.store.accounts.delete(account.id);
     return json({ status: true });

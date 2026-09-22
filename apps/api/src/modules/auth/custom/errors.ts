@@ -16,18 +16,20 @@ export class AuthError extends Error {
 }
 
 export const Errors = {
-  invalidBody: (message: string) =>
-    new AuthError(400, 'INVALID_BODY', message),
+  invalidBody: (message: string) => new AuthError(400, 'INVALID_BODY', message),
   invalidCredentials: () =>
-    new AuthError(401, 'INVALID_EMAIL_OR_PASSWORD', 'Invalid email or password'),
+    new AuthError(
+      401,
+      'INVALID_EMAIL_OR_PASSWORD',
+      'Invalid email or password',
+    ),
   emailNotVerified: () =>
     new AuthError(403, 'EMAIL_NOT_VERIFIED', 'Email is not verified'),
   userAlreadyExists: () =>
     new AuthError(422, 'USER_ALREADY_EXISTS', 'User already exists'),
   invalidToken: () =>
     new AuthError(400, 'INVALID_TOKEN', 'Invalid or expired token'),
-  untrustedOrigin: () =>
-    new AuthError(403, 'INVALID_ORIGIN', 'Invalid origin'),
+  untrustedOrigin: () => new AuthError(403, 'INVALID_ORIGIN', 'Invalid origin'),
   invalidCallbackURL: () =>
     new AuthError(403, 'INVALID_CALLBACK_URL', 'Invalid callback URL'),
   tooManyRequests: (retryAfter: number) =>
@@ -42,5 +44,9 @@ export const Errors = {
   userBanned: () =>
     new AuthError(403, 'USER_BANNED', 'This account has been suspended'),
   accountHasNoPassword: () =>
-    new AuthError(422, 'ACCOUNT_HAS_NO_PASSWORD', 'This account has no password'),
+    new AuthError(
+      422,
+      'ACCOUNT_HAS_NO_PASSWORD',
+      'This account has no password',
+    ),
 };

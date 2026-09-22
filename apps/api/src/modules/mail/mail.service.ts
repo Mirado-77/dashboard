@@ -20,14 +20,19 @@ export class MailService {
     const host = config.get('SMTP_HOST', { infer: true });
     this.from = config.get('MAIL_FROM', { infer: true });
     this.transport = host
-      ? createTransport({ host, port: config.get('SMTP_PORT', { infer: true }) })
+      ? createTransport({
+          host,
+          port: config.get('SMTP_PORT', { infer: true }),
+        })
       : null;
   }
 
   async send(message: MailMessage): Promise<void> {
     if (!this.transport) {
       // No SMTP configured: development fallback, the mail goes to the logs.
-      this.logger.warn(`SMTP_HOST not set, mail to ${message.to}:\n${message.text}`);
+      this.logger.warn(
+        `SMTP_HOST not set, mail to ${message.to}:\n${message.text}`,
+      );
       return;
     }
     await this.transport.sendMail({ from: this.from, ...message });

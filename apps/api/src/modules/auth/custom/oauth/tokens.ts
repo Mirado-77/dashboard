@@ -7,7 +7,8 @@ const EXPIRY_MARGIN_MS = 60_000;
 
 /** Account columns for a set of tokens, encrypted at rest. */
 export function encryptTokens(auth: AuthContext, tokens: OAuthTokens) {
-  const seal = (value: string | null) => (value ? auth.secretBox.encrypt(value) : null);
+  const seal = (value: string | null) =>
+    value ? auth.secretBox.encrypt(value) : null;
   return {
     accessToken: seal(tokens.accessToken),
     refreshToken: seal(tokens.refreshToken),
@@ -28,11 +29,15 @@ async function refresh(
   auth: AuthContext,
   account: AccountRecord,
 ): Promise<ProviderAccessToken> {
-  const provider = auth.options.socialProviders?.find((p) => p.id === account.providerId);
+  const provider = auth.options.socialProviders?.find(
+    (p) => p.id === account.providerId,
+  );
   if (!provider?.refreshAccessToken || !account.refreshToken) {
     throw new Error(`Cannot refresh ${account.providerId} token`);
   }
-  const tokens = await provider.refreshAccessToken(auth.secretBox.decrypt(account.refreshToken));
+  const tokens = await provider.refreshAccessToken(
+    auth.secretBox.decrypt(account.refreshToken),
+  );
   const columns = encryptTokens(auth, {
     ...tokens,
     // Providers often omit these on refresh, keep the previous values.
@@ -41,7 +46,8 @@ async function refresh(
   await auth.store.accounts.update(account.id, {
     ...columns,
     refreshToken: columns.refreshToken ?? account.refreshToken,
-    refreshTokenExpiresAt: columns.refreshTokenExpiresAt ?? account.refreshTokenExpiresAt,
+    refreshTokenExpiresAt:
+      columns.refreshTokenExpiresAt ?? account.refreshTokenExpiresAt,
     idToken: columns.idToken ?? account.idToken,
   });
   return {
@@ -73,7 +79,9 @@ export async function getAccessToken(
   // Concurrent widgets must not spend the same refresh token twice.
   let pending = pendingRefreshes.get(account.id);
   if (!pending) {
-    pending = refresh(auth, account).finally(() => pendingRefreshes.delete(account.id));
+    pending = refresh(auth, account).finally(() =>
+      pendingRefreshes.delete(account.id),
+    );
     pendingRefreshes.set(account.id, pending);
   }
   return pending;

@@ -21,9 +21,24 @@ interface SeedUser {
 }
 
 const users: SeedUser[] = [
-  { name: 'Rick', email: 'rick@citadel.io', password: 'wubbalubba', role: 'admin' },
-  { name: 'Morty', email: 'morty@citadel.io', password: 'aw-geez-rick', role: 'user' },
-  { name: 'Summer', email: 'summer@citadel.io', password: 'whatever-grandpa', role: 'user' },
+  {
+    name: 'Rick',
+    email: 'rick@citadel.io',
+    password: 'wubbalubba',
+    role: 'admin',
+  },
+  {
+    name: 'Morty',
+    email: 'morty@citadel.io',
+    password: 'aw-geez-rick',
+    role: 'user',
+  },
+  {
+    name: 'Summer',
+    email: 'summer@citadel.io',
+    password: 'whatever-grandpa',
+    role: 'user',
+  },
 ];
 
 async function main() {
@@ -90,7 +105,9 @@ try {
   await main();
 } catch (error) {
   if (isConnectionRefused(error)) {
-    console.error('Database unreachable. Start it with: docker compose up -d db');
+    console.error(
+      'Database unreachable. Start it with: docker compose up -d db',
+    );
   } else {
     console.error(error);
   }
