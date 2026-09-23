@@ -6,6 +6,7 @@ import { AboutModule } from './modules/about/about.module.js';
 import { authFactory } from './modules/auth/auth.config.js';
 import { AuthModule } from './modules/auth/auth.module.js';
 import { MailModule } from './modules/mail/mail.module.js';
+import { ServicesModule } from './modules/services/services.module.js';
 import { UsersModule } from './modules/users/users.module.js';
 
 @Module({
@@ -14,6 +15,7 @@ import { UsersModule } from './modules/users/users.module.js';
     DatabaseModule,
     AuthModule.forRootAsync({ imports: [MailModule], ...authFactory }),
     AboutModule,
+    ServicesModule,
     UsersModule,
   ],
 })
