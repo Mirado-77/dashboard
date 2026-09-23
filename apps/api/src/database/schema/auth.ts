@@ -6,15 +6,7 @@ import {
   timestamp,
   uniqueIndex,
 } from 'drizzle-orm/pg-core';
-
-const timestamps = {
-  createdAt: timestamp('created_at', { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-};
+import { timestamps } from './columns.js';
 
 export const users = pgTable('user', {
   id: text('id').primaryKey(),
