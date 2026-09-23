@@ -15,6 +15,13 @@
       "when": 1789608188651,
       "tag": "0001_admin_ban",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790168566972,
+      "tag": "0002_service_subscription",
+      "breakpoints": true
     }
   ]
 }
