@@ -1,6 +1,6 @@
 "use client";
 
-import { LogOut, Link2, UserRound } from "lucide-react";
+import { LogOut, Link2, UserRound, Blocks } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -49,6 +49,12 @@ export function UserMenu({ user }: { user: Pick<User, "name" | "email" | "image"
           <Link href="/settings/profile">
             <UserRound />
             Profile
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link href="/settings/services">
+            <Blocks />
+            Services
           </Link>
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
