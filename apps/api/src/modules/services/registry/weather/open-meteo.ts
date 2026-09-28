@@ -5,6 +5,8 @@
 ** open-meteo
 */
 
+import { WidgetDataError } from '../errors.js';
+
 const GEOCODING_URL = 'https://geocoding-api.open-meteo.com/v1/search';
 const FORECAST_URL = 'https://api.open-meteo.com/v1/forecast';
 const TIMEOUT_MS = 5000;
@@ -23,7 +25,6 @@ export interface OpenMeteoForecast {
     weather_code: number[];
   };
 }
-export class WidgetDataError extends Error {}
 
 async function getJson<T>(url: URL): Promise<T> {
   const response = await fetch(url, { signal: AbortSignal.timeout(TIMEOUT_MS) });
