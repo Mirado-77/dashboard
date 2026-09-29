@@ -41,6 +41,12 @@ export const Errors = {
   notFound: () => new AuthError(404, 'NOT_FOUND', 'Not found'),
   unauthorized: () => new AuthError(401, 'UNAUTHORIZED', 'Unauthorized'),
   forbidden: () => new AuthError(403, 'FORBIDDEN', 'Forbidden'),
+  providerReauthRequired: (providerId: string) =>
+    new AuthError(
+      401,
+      'PROVIDER_REAUTH_REQUIRED',
+      `Reconnect your ${providerId} account`,
+    ),
   userBanned: () =>
     new AuthError(403, 'USER_BANNED', 'This account has been suspended'),
   accountHasNoPassword: () =>

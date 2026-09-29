@@ -55,6 +55,8 @@ export interface OAuth2ProviderConfig {
   authorizationParams?: Record<string, string>;
   pkce?: boolean;
   disableSignIn?: boolean;
+  /** False for providers issuing tokens that never expire, such as GitHub. */
+  supportsRefresh?: boolean;
   getUserInfo(tokens: OAuthTokens): Promise<OAuthUserInfo>;
 }
 
@@ -143,11 +145,15 @@ export function createOAuth2Provider(
       });
     },
     getUserInfo: config.getUserInfo,
-    refreshAccessToken(refreshToken) {
-      return requestToken({
-        grant_type: 'refresh_token',
-        refresh_token: refreshToken,
-      });
-    },
+    ...((config.supportsRefresh ?? true)
+      ? {
+          refreshAccessToken(refreshToken: string) {
+            return requestToken({
+              grant_type: 'refresh_token',
+              refresh_token: refreshToken,
+            });
+          },
+        }
+      : {}),
   };
 }
