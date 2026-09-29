@@ -6,6 +6,7 @@ import type {
   OAuthUserInfo,
 } from './oauth/provider.js';
 import type { AuthOptions } from './options.js';
+import { github } from './oauth/providers/github.js';
 import { memoryStore } from './store/memory.js';
 import type { AuthStore } from './store/store.js';
 
@@ -319,6 +320,46 @@ describe('OAuth', () => {
       session,
     );
     expect((await unlink.json()).code).toBe('FAILED_TO_UNLINK_LAST_ACCOUNT');
+  });
+
+  it('asks the user to reconnect when the refresh is rejected', async () => {
+    const { auth, store, fake } = setup();
+    fake.setExpiresIn(-10);
+    fake.identity('squanchy');
+    await oauthFlow(auth, 'squanchy');
+    const user = await store.users.findByEmail('squanchy@fake.test');
+    fake.provider.refreshAccessToken = async () => {
+      throw new Error('invalid_grant');
+    };
+
+    await expect(
+      auth.api.getAccessToken({ userId: user!.id, providerId: 'fake' }),
+    ).rejects.toMatchObject({ code: 'PROVIDER_REAUTH_REQUIRED' });
+
+    // The dead tokens are gone, the account stays linked.
+    const account = await store.accounts.findByUser(user!.id, 'fake');
+    expect(account).not.toBeNull();
+    expect(account?.accessToken).toBeNull();
+    expect(account?.refreshToken).toBeNull();
+  });
+
+  it('asks the user to reconnect when the provider cannot refresh', async () => {
+    const { auth, store, fake } = setup();
+    fake.setExpiresIn(-10);
+    fake.identity('squanchy');
+    await oauthFlow(auth, 'squanchy');
+    const user = await store.users.findByEmail('squanchy@fake.test');
+    delete fake.provider.refreshAccessToken;
+
+    await expect(
+      auth.api.getAccessToken({ userId: user!.id, providerId: 'fake' }),
+    ).rejects.toMatchObject({ code: 'PROVIDER_REAUTH_REQUIRED' });
+  });
+
+  it('does not try to refresh a github token', () => {
+    const provider = github({ clientId: 'id', clientSecret: 'secret' });
+
+    expect(provider.refreshAccessToken).toBeUndefined();
   });
 
   it('refuses sign in with a link-only provider', async () => {

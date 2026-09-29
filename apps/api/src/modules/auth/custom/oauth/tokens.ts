@@ -1,5 +1,6 @@
 import type { ProviderAccessToken } from '../../auth.contract.js';
 import type { AuthContext } from '../context.js';
+import { Errors } from '../errors.js';
 import type { AccountRecord } from '../store/store.js';
 import type { OAuthTokens } from './provider.js';
 
@@ -25,6 +26,23 @@ export function parseScopes(scope: string | null): string[] {
 
 const pendingRefreshes = new Map<string, Promise<ProviderAccessToken>>();
 
+/**
+ * Drops the tokens we know to be useless, so the next call asks the user to
+ * reconnect instead of replaying a refresh that cannot succeed.
+ */
+async function forget(
+  auth: AuthContext,
+  account: AccountRecord,
+): Promise<never> {
+  await auth.store.accounts.update(account.id, {
+    accessToken: null,
+    accessTokenExpiresAt: null,
+    refreshToken: null,
+    refreshTokenExpiresAt: null,
+  });
+  throw Errors.providerReauthRequired(account.providerId);
+}
+
 async function refresh(
   auth: AuthContext,
   account: AccountRecord,
@@ -33,11 +51,21 @@ async function refresh(
     (p) => p.id === account.providerId,
   );
   if (!provider?.refreshAccessToken || !account.refreshToken) {
-    throw new Error(`Cannot refresh ${account.providerId} token`);
+    return forget(auth, account);
   }
-  const tokens = await provider.refreshAccessToken(
-    auth.secretBox.decrypt(account.refreshToken),
-  );
+
+  let tokens: OAuthTokens;
+  try {
+    tokens = await provider.refreshAccessToken(
+      auth.secretBox.decrypt(account.refreshToken),
+    );
+  } catch (error) {
+    // Revoked, expired or rejected: only the user can fix it.
+    auth.options.logger?.warn(
+      `Refresh failed for ${account.providerId}: ${String(error)}`,
+    );
+    return forget(auth, account);
+  }
   const columns = encryptTokens(auth, {
     ...tokens,
     // Providers often omit these on refresh, keep the previous values.
