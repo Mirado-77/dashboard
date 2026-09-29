@@ -27,6 +27,8 @@ export function github(options: {
     authorizationEndpoint: 'https://github.com/login/oauth/authorize',
     tokenEndpoint: 'https://github.com/login/oauth/access_token',
     scopes: options.scopes ?? ['read:user', 'user:email'],
+    // An OAuth App token does not expire and comes with no refresh token.
+    supportsRefresh: false,
     async getUserInfo({ accessToken }) {
       const headers = {
         authorization: `Bearer ${accessToken}`,
