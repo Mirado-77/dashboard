@@ -141,6 +141,49 @@ describe('buildConfigSchema', () => {
     expect(result.data).toEqual({ days: 7 });
   });
 
+  it.each(['', '  ', null, '7abc', '1e3'])(
+    'rejects %j for an integer parameter',
+    (value) => {
+      const result = buildConfigSchema([days]).safeParse({ days: value });
+
+      expect(result.success).toBe(false);
+    },
+  );
+
+  it('reads a negative integer sent as text', () => {
+    const result = buildConfigSchema([days]).safeParse({ days: '-2' });
+
+    expect(result.data).toEqual({ days: -2 });
+  });
+
+  it('rejects an integer too large to be stored exactly', () => {
+    const result = buildConfigSchema([days]).safeParse({
+      days: '99999999999999999999',
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects an empty required string', () => {
+    const result = buildConfigSchema([city]).safeParse({ city: '   ' });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects a string longer than 500 characters', () => {
+    const result = buildConfigSchema([city]).safeParse({
+      city: 'a'.repeat(501),
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('trims a string parameter', () => {
+    const result = buildConfigSchema([city]).parse({ city: '  Paris ' });
+
+    expect(result).toEqual({ city: 'Paris' });
+  });
+
   it('rejects an unknown parameter', () => {
     const result = buildConfigSchema([city]).safeParse({
       city: 'Paris',
