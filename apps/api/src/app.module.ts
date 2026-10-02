@@ -8,6 +8,7 @@ import { AuthModule } from './modules/auth/auth.module.js';
 import { MailModule } from './modules/mail/mail.module.js';
 import { ServicesModule } from './modules/services/services.module.js';
 import { UsersModule } from './modules/users/users.module.js';
+import { WidgetsModule } from './modules/widgets/widgets.module.js';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { UsersModule } from './modules/users/users.module.js';
     AboutModule,
     ServicesModule,
     UsersModule,
+    WidgetsModule,
   ],
 })
 export class AppModule {}
