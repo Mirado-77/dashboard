@@ -1,4 +1,11 @@
-import { index, pgTable, text, uniqueIndex } from 'drizzle-orm/pg-core';
+import {
+  index,
+  integer,
+  jsonb,
+  pgTable,
+  text,
+  uniqueIndex,
+} from 'drizzle-orm/pg-core';
 import { timestamps } from './columns.js';
 import { users } from './auth.js';
 
@@ -30,4 +37,21 @@ export const serviceSubscriptions = pgTable(
     ),
     index('service_subscription_user_id_idx').on(table.userId),
   ],
+);
+
+export const widgetInstances = pgTable(
+  'widget_instance',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    serviceId: text('service_id').notNull(),
+    widgetId: text('widget_id').notNull(),
+    config: jsonb('config').$type<Record<string, string | number>>().notNull(),
+    refreshRate: integer('refresh_rate').notNull(),
+    position: integer('position').notNull(),
+    ...timestamps,
+  },
+  (table) => [index('widget_instance_user_id_idx').on(table.userId)],
 );
