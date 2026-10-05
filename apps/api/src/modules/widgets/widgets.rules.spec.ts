@@ -3,6 +3,7 @@ import type { Widget } from '../services/registry/types.js';
 import {
   MAX_REFRESH_RATE,
   configFor,
+  moveTo,
   refreshRateFor,
 } from './widgets.rules.js';
 
@@ -52,5 +53,20 @@ describe('refreshRateFor', () => {
     expect(() => refreshRateFor(temperature, MAX_REFRESH_RATE + 1)).toThrow(
       BadRequestException,
     );
+  });
+});
+
+describe('moveTo', () => {
+  it('moves a widget up or down, shifting the ones in between', () => {
+    expect(moveTo(['a', 'b', 'c', 'd'], 'd', 1)).toEqual(['a', 'd', 'b', 'c']);
+    expect(moveTo(['a', 'b', 'c', 'd'], 'a', 2)).toEqual(['b', 'c', 'a', 'd']);
+  });
+
+  it('clamps a position past the end', () => {
+    expect(moveTo(['a', 'b', 'c'], 'a', 99)).toEqual(['b', 'c', 'a']);
+  });
+
+  it('changes nothing when the widget stays in place', () => {
+    expect(moveTo(['a', 'b', 'c'], 'b', 1)).toEqual(['a', 'b', 'c']);
   });
 });
