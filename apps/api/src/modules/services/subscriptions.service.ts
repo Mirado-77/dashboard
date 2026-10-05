@@ -2,11 +2,7 @@ import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { and, eq } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
 import { DATABASE, type Database } from '../../database/database.module.js';
-import {
-  accounts,
-  serviceSubscriptions,
-  widgetInstances,
-} from '../../database/schema/index.js';
+import { accounts, serviceSubscriptions } from '../../database/schema/index.js';
 import {
   CredentialsCipher,
   type ServiceCredentials,
@@ -15,7 +11,6 @@ import { ServiceRegistry } from './registry/registry.js';
 import type { Service, Widget } from './registry/types.js';
 import { credentialsToStore, providerOf } from './subscriptions.rules.js';
 
-/** What the web app needs to offer a widget and build its form. */
 export type WidgetSummary = Pick<
   Widget,
   | 'id'
@@ -131,37 +126,14 @@ export class SubscriptionsService {
 
   async unsubscribe(userId: string, serviceId: string): Promise<void> {
     this.service(serviceId);
-    await this.db.transaction(async (tx) => {
-      await tx
-        .delete(widgetInstances)
-        .where(
-          and(
-            eq(widgetInstances.userId, userId),
-            eq(widgetInstances.serviceId, serviceId),
-          ),
-        );
-      await tx
-        .delete(serviceSubscriptions)
-        .where(
-          and(
-            eq(serviceSubscriptions.userId, userId),
-            eq(serviceSubscriptions.serviceId, serviceId),
-          ),
-        );
-    });
-  }
-
-  async isSubscribed(userId: string, serviceId: string): Promise<boolean> {
-    const [row] = await this.db
-      .select({ id: serviceSubscriptions.id })
-      .from(serviceSubscriptions)
+    await this.db
+      .delete(serviceSubscriptions)
       .where(
         and(
           eq(serviceSubscriptions.userId, userId),
           eq(serviceSubscriptions.serviceId, serviceId),
         ),
       );
-    return row !== undefined;
   }
 
   async credentialsOf(

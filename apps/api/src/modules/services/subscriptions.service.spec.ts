@@ -1,10 +1,7 @@
 import type { ConfigService } from '@nestjs/config';
 import type { Env } from '../../config/env.js';
 import type { Database } from '../../database/database.module.js';
-import {
-  serviceSubscriptions,
-  widgetInstances,
-} from '../../database/schema/index.js';
+import { serviceSubscriptions } from '../../database/schema/index.js';
 import { CredentialsCipher } from './credentials.service.js';
 import { ServiceRegistry } from './registry/registry.js';
 import type { Service } from './registry/types.js';
@@ -25,7 +22,19 @@ function service(overrides: Partial<Service>): Service {
   };
 }
 
-const weather = service({});
+const weather = service({
+  widgets: [
+    {
+      id: 'forecast',
+      name: 'Forecast',
+      description: 'Forecast of a city',
+      params: [{ name: 'city', type: 'string', required: true }],
+      defaultRefreshRate: 1800,
+      minRefreshRate: 300,
+      getWidgetData: async () => null,
+    },
+  ],
+});
 const github = service({ id: 'github', name: 'GitHub', providerType: 'oauth' });
 const jira = service({
   id: 'jira',
@@ -63,7 +72,6 @@ function setup(rows: Row[] = [], linkedProviders: string[] = []) {
         deletedFrom.push(table);
       },
     }),
-    transaction: (run: (tx: Database) => Promise<void>) => run(db),
   } as unknown as Database;
 
   const subscriptions = new SubscriptionsService(
@@ -157,12 +165,12 @@ describe('SubscriptionsService', () => {
     expect(deletedFrom).toHaveLength(0);
   });
 
-  it('deletes the subscription, its credentials and its widgets', async () => {
+  it('deletes the subscription, and its credentials with it', async () => {
     const { subscriptions, deletedFrom } = setup();
 
     await subscriptions.unsubscribe('user-1', 'jira');
 
-    expect(deletedFrom).toEqual([widgetInstances, serviceSubscriptions]);
+    expect(deletedFrom).toEqual([serviceSubscriptions]);
   });
 
   it('lists the widgets of each service, without their code', async () => {
@@ -170,19 +178,17 @@ describe('SubscriptionsService', () => {
 
     const [summary] = await subscriptions.list('user-1');
 
-    expect(summary.widgets).toEqual([]);
+    expect(summary.widgets).toEqual([
+      {
+        id: 'forecast',
+        name: 'Forecast',
+        description: 'Forecast of a city',
+        params: [{ name: 'city', type: 'string', required: true }],
+        defaultRefreshRate: 1800,
+        minRefreshRate: 300,
+      },
+    ]);
     expect(JSON.stringify(summary)).not.toContain('getWidgetData');
-  });
-
-  it('tells whether a user is subscribed to a service', async () => {
-    expect(await setup().subscriptions.isSubscribed('user-1', 'jira')).toBe(
-      false,
-    );
-    expect(
-      await setup([
-        { serviceId: 'jira', credentials: null },
-      ]).subscriptions.isSubscribed('user-1', 'jira'),
-    ).toBe(true);
   });
 
   it('decrypts the credentials for the widgets only', async () => {
