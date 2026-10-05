@@ -43,4 +43,9 @@ export class WidgetsController {
     await this.widgets.remove(session.user.id, id);
     return { success: true };
   }
+
+  @Get(':id/data')
+  data(@CurrentSession() session: AuthSession, @Param('id') id: string) {
+    return this.widgets.data(session.user.id, id);
+  }
 }

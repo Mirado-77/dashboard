@@ -5,16 +5,13 @@ import { ServiceRegistry } from './registry/registry.js';
 import { services } from './registry/services.js';
 import { ServicesController } from './services.controller.js';
 import { SubscriptionsService } from './subscriptions.service.js';
-import { WidgetsController } from './widgets.controller.js';
-import { WidgetsService } from './widgets.service.js';
 
 @Module({
-  controllers: [ServicesController, WidgetsController],
+  controllers: [ServicesController],
   providers: [
     CredentialsCipher,
     ProviderTokens,
     SubscriptionsService,
-    WidgetsService,
     {
       provide: ServiceRegistry,
       useFactory: () => new ServiceRegistry(services),

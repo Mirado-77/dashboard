@@ -31,3 +31,9 @@ export function refreshRateFor(widget: Widget, refreshRate?: number): number {
   }
   return refreshRate;
 }
+
+export function moveTo(ids: string[], id: string, position: number): string[] {
+  const others = ids.filter((other) => other !== id);
+  const index = Math.min(Math.max(position, 0), others.length);
+  return [...others.slice(0, index), id, ...others.slice(index)];
+}

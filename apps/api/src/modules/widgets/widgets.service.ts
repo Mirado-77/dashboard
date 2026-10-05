@@ -1,7 +1,9 @@
 import {
+  BadGatewayException,
   BadRequestException,
   Inject,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { and, asc, eq, gt, max, sql } from 'drizzle-orm';
@@ -12,9 +14,10 @@ import {
   serviceSubscriptions,
   widgetInstances,
 } from '../../database/schema/index.js';
+import { WidgetDataError } from '../services/registry/errors.js';
 import { ServiceRegistry } from '../services/registry/registry.js';
 import type { Widget } from '../services/registry/types.js';
-import { configFor, refreshRateFor } from './widgets.rules.js';
+import { configFor, moveTo, refreshRateFor } from './widgets.rules.js';
 
 const widgetBodySchema = z.object({
   serviceId: z.string().trim(),
@@ -26,10 +29,13 @@ const widgetBodySchema = z.object({
 const widgetUpdateSchema = z.object({
   config: z.record(z.string(), z.unknown()).optional(),
   refreshRate: z.int().optional(),
+  position: z.int().min(0).optional(),
 });
 
 @Injectable()
 export class WidgetsService {
+  private readonly logger = new Logger(WidgetsService.name);
+
   constructor(
     @Inject(DATABASE) private readonly db: Database,
     private readonly registry: ServiceRegistry,
@@ -63,8 +69,8 @@ export class WidgetsService {
     return row;
   }
 
-  async list(userId: string) {
-    const rows = await this.db
+  async list(userId: string, db: Pick<Database, 'select'> = this.db) {
+    const rows = await db
       .select()
       .from(widgetInstances)
       .where(eq(widgetInstances.userId, userId))
@@ -132,31 +138,51 @@ export class WidgetsService {
     if (!result.success) {
       throw new BadRequestException({
         code: 'INVALID_WIDGET',
-        message: 'Expected a config and/or an integer refreshRate',
+        message:
+          'Expected a config, an integer refreshRate and/or a position from 0',
       });
     }
     const input = result.data;
     const row = await this.instance(userId, id);
     const widget = this.widget(row.serviceId, row.widgetId);
 
-    const [updated] = await this.db
-      .update(widgetInstances)
-      .set({
-        config:
-          input.config === undefined
-            ? row.config
-            : configFor(widget, input.config),
-        refreshRate:
-          input.refreshRate === undefined
-            ? row.refreshRate
-            : refreshRateFor(widget, input.refreshRate),
-        updatedAt: new Date(),
-      })
-      .where(
-        and(eq(widgetInstances.id, id), eq(widgetInstances.userId, userId)),
-      )
-      .returning();
-    return updated;
+    const values = {
+      config:
+        input.config === undefined
+          ? row.config
+          : configFor(widget, input.config),
+      refreshRate:
+        input.refreshRate === undefined
+          ? row.refreshRate
+          : refreshRateFor(widget, input.refreshRate),
+      updatedAt: new Date(),
+    };
+
+    return this.db.transaction(async (tx) => {
+      if (input.position !== undefined) {
+        const order = (await this.list(userId, tx)).map((other) => other.id);
+        const next = moveTo(order, id, input.position);
+        // Only the widgets between the old and the new place change.
+        for (const [position, otherId] of next.entries()) {
+          if (otherId !== id && order[position] !== otherId) {
+            await tx
+              .update(widgetInstances)
+              .set({ position })
+              .where(eq(widgetInstances.id, otherId));
+          }
+        }
+        Object.assign(values, { position: next.indexOf(id) });
+      }
+
+      const [updated] = await tx
+        .update(widgetInstances)
+        .set(values)
+        .where(
+          and(eq(widgetInstances.id, id), eq(widgetInstances.userId, userId)),
+        )
+        .returning();
+      return updated;
+    });
   }
 
   /** Shifts the widgets after it so positions stay 0..n-1, as dnd-kit expects. */
@@ -185,5 +211,27 @@ export class WidgetsService {
           ),
         );
     });
+  }
+
+  async data(userId: string, id: string): Promise<{ data: unknown }> {
+    const row = await this.instance(userId, id);
+    const widget = this.widget(row.serviceId, row.widgetId);
+    const config = configFor(widget, row.config);
+
+    try {
+      return { data: await widget.getWidgetData({ config }) };
+    } catch (error) {
+      const known = error instanceof WidgetDataError;
+      if (!known) {
+        this.logger.error(
+          `${row.serviceId}/${row.widgetId} failed`,
+          error instanceof Error ? error.stack : String(error),
+        );
+      }
+      throw new BadGatewayException({
+        code: 'WIDGET_DATA_UNAVAILABLE',
+        message: known ? error.message : 'The service could not be reached',
+      });
+    }
   }
 }

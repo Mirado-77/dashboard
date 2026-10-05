@@ -1,12 +1,12 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Logger, NotFoundException } from '@nestjs/common';
 import type { Database } from '../../database/database.module.js';
-import {
-  serviceSubscriptions,
-  widgetInstances,
-} from '../../database/schema/index.js';
+import { serviceSubscriptions } from '../../database/schema/index.js';
+import { WidgetDataError } from '../services/registry/errors.js';
 import { ServiceRegistry } from '../services/registry/registry.js';
-import type { Service } from '../services/registry/types.js';
+import type { Service, WidgetContext } from '../services/registry/types.js';
 import { WidgetsService } from './widgets.service.js';
+
+let getWidgetData: (ctx: WidgetContext) => Promise<unknown>;
 
 const weather: Service = {
   id: 'weather',
@@ -24,10 +24,15 @@ const weather: Service = {
       ],
       defaultRefreshRate: 300,
       minRefreshRate: 60,
-      getWidgetData: async () => null,
+      getWidgetData: (ctx) => getWidgetData(ctx),
     },
   ],
 };
+
+beforeAll(() => Logger.overrideLogger(false));
+beforeEach(() => {
+  getWidgetData = async ({ config }) => ({ for: config });
+});
 
 interface State {
   subscribed?: boolean;
@@ -35,48 +40,72 @@ interface State {
   lastPosition?: number | null;
   /** Rows the user owns, as the filtered queries would return them. */
   owned?: Record<string, unknown>[];
+  /** The whole dashboard in order, when it differs from `owned`. */
+  ordered?: Record<string, unknown>[];
 }
 
-function setup({ subscribed = true, lastPosition = null, owned = [] }: State) {
+function setup({
+  subscribed = true,
+  lastPosition = null,
+  owned = [],
+  ordered = owned,
+}: State) {
   const inserted: Record<string, unknown>[] = [];
+  /** Every `set` sent to the widget table, in order. */
+  const updates: Record<string, unknown>[] = [];
+
+  const update = () => ({
+    set: (values: Record<string, unknown>) => ({
+      where: () => {
+        updates.push(values);
+        return Object.assign(Promise.resolve(), {
+          returning: async () => [{ ...owned[0], ...values }],
+        });
+      },
+    }),
+  });
+
+  const select = (fields?: Record<string, unknown>) => ({
+    from: (table: unknown) => ({
+      where: () => {
+        const rows =
+          table === serviceSubscriptions
+            ? subscribed
+              ? [{ id: 'sub-1' }]
+              : []
+            : fields && 'position' in fields
+              ? [{ position: lastPosition }]
+              : owned;
+        return Object.assign(Promise.resolve(rows), {
+          orderBy: async () => ordered,
+        });
+      },
+    }),
+  });
 
   const db = {
-    select: (fields?: Record<string, unknown>) => ({
-      from: (table: unknown) => ({
-        where: async () => {
-          if (table === serviceSubscriptions) {
-            return subscribed ? [{ id: 'sub-1' }] : [];
-          }
-          if (table === widgetInstances && fields && 'position' in fields) {
-            return [{ position: lastPosition }];
-          }
-          return owned;
-        },
-      }),
-    }),
+    select,
     insert: () => ({
       values: (values: Record<string, unknown>) => {
         inserted.push(values);
         return { returning: async () => [values] };
       },
     }),
-    update: () => ({
-      set: (values: Record<string, unknown>) => ({
-        where: () => ({ returning: async () => [{ ...owned[0], ...values }] }),
-      }),
-    }),
-    transaction: async (fn: (tx: unknown) => Promise<void>) =>
+    update,
+    transaction: async (fn: (tx: unknown) => Promise<unknown>) =>
       fn({
+        select,
+        update,
         delete: () => ({
           where: () => ({ returning: async () => owned }),
         }),
-        update: () => ({ set: () => ({ where: async () => undefined }) }),
       }),
   } as unknown as Database;
 
   return {
     widgets: new WidgetsService(db, new ServiceRegistry([weather])),
     inserted,
+    updates,
   };
 }
 
@@ -159,6 +188,29 @@ describe('WidgetsService.update', () => {
       widgets.update('user-1', 'w-1', { refreshRate: 600 }),
     ).rejects.toThrow(NotFoundException);
   });
+
+  it('moves a widget and renumbers only the ones it went past', async () => {
+    const owned = ['a', 'b', 'c', 'd'].map((id, position) => ({
+      ...row,
+      id,
+      position,
+    }));
+    const { widgets, updates } = setup({ owned: [owned[3]], ordered: owned });
+
+    await widgets.update('user-1', 'd', { position: 1 });
+
+    // b and c shift down, a stays, then d itself lands at 1.
+    expect(updates.map((values) => values.position)).toEqual([2, 3, 1]);
+  });
+
+  it('rejects a negative position', async () => {
+    const { widgets, updates } = setup({ owned: [row] });
+
+    await expect(
+      widgets.update('user-1', 'w-1', { position: -1 }),
+    ).rejects.toThrow(BadRequestException);
+    expect(updates).toHaveLength(0);
+  });
 });
 
 describe('WidgetsService.remove', () => {
@@ -167,6 +219,69 @@ describe('WidgetsService.remove', () => {
 
     await expect(widgets.remove('user-1', 'w-1')).rejects.toThrow(
       NotFoundException,
+    );
+  });
+});
+
+describe('WidgetsService.data', () => {
+  const row = {
+    id: 'w-1',
+    serviceId: 'weather',
+    widgetId: 'temperature',
+    config: { city: 'Paris', days: 3 },
+    refreshRate: 300,
+  };
+
+  it('fetches the data with the stored config', async () => {
+    const { widgets } = setup({ owned: [row] });
+
+    expect(await widgets.data('user-1', 'w-1')).toEqual({
+      data: { for: { city: 'Paris', days: 3 } },
+    });
+  });
+
+  it('answers 404 for a widget the user does not own', async () => {
+    const { widgets } = setup({ owned: [] });
+
+    await expect(widgets.data('user-1', 'w-1')).rejects.toThrow(
+      NotFoundException,
+    );
+  });
+
+  it('answers 502 with the reason when the third party fails', async () => {
+    getWidgetData = async () => {
+      throw new WidgetDataError('Unknown city: Paris');
+    };
+    const { widgets } = setup({ owned: [row] });
+
+    await expect(widgets.data('user-1', 'w-1')).rejects.toMatchObject({
+      status: 502,
+      response: {
+        code: 'WIDGET_DATA_UNAVAILABLE',
+        message: 'Unknown city: Paris',
+      },
+    });
+  });
+
+  it('hides the details of an unexpected failure', async () => {
+    getWidgetData = async () => {
+      throw new TypeError('fetch failed: 10.0.0.1 refused');
+    };
+    const { widgets } = setup({ owned: [row] });
+
+    await expect(widgets.data('user-1', 'w-1')).rejects.toMatchObject({
+      status: 502,
+      response: { message: 'The service could not be reached' },
+    });
+  });
+
+  it('refuses a stored config the widget no longer accepts', async () => {
+    const { widgets } = setup({
+      owned: [{ ...row, config: { town: 'Paris' } }],
+    });
+
+    await expect(widgets.data('user-1', 'w-1')).rejects.toThrow(
+      BadRequestException,
     );
   });
 });
