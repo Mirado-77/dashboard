@@ -1,16 +1,29 @@
 import { z } from 'zod';
 import type { WidgetParam } from './types.js';
 
+const MAX_STRING_LENGTH = 500;
+
+// Not z.coerce: it turns "", "  " and null into 0.
+const integer = z
+  .union([
+    z.number(),
+    z
+      .string()
+      .regex(/^-?\d+$/)
+      .transform(Number),
+  ])
+  .pipe(z.number().int());
+
 function paramSchema(param: WidgetParam): z.ZodType {
   if (param.type === 'integer') {
-    const base = z.coerce.number().int();
     if (typeof param.defaultValue === 'number') {
-      return base.default(param.defaultValue);
+      return integer.default(param.defaultValue);
     }
-    return param.required ? base : base.optional();
+    return param.required ? integer : integer.optional();
   }
 
-  const base = z.string();
+  const text = z.string().trim().max(MAX_STRING_LENGTH);
+  const base = param.required ? text.min(1) : text;
   if (typeof param.defaultValue === 'string') {
     return base.default(param.defaultValue);
   }
