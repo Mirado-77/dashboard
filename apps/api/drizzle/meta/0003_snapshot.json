@@ -1,5 +1,5 @@
 {
-  "id": "0ce89dea-150a-41e2-ae80-d776427131cf",
+  "id": "caeb783e-f0b8-492e-b284-8a7c7f63ee5c",
   "prevId": "bca1674b-6fa5-4d9c-9f7e-80665e5b083c",
   "version": "7",
   "dialect": "postgresql",
@@ -520,12 +520,6 @@
           "primaryKey": false,
           "notNull": true
         },
-        "subscription_id": {
-          "name": "subscription_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
         "service_id": {
           "name": "service_id",
           "type": "text",
@@ -595,19 +589,6 @@
           "tableTo": "user",
           "columnsFrom": [
             "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "widget_instance_subscription_id_service_subscription_id_fk": {
-          "name": "widget_instance_subscription_id_service_subscription_id_fk",
-          "tableFrom": "widget_instance",
-          "tableTo": "service_subscription",
-          "columnsFrom": [
-            "subscription_id"
           ],
           "columnsTo": [
             "id"

@@ -1,7 +1,10 @@
 import type { ConfigService } from '@nestjs/config';
 import type { Env } from '../../config/env.js';
 import type { Database } from '../../database/database.module.js';
-import { serviceSubscriptions } from '../../database/schema/index.js';
+import {
+  serviceSubscriptions,
+  widgetInstances,
+} from '../../database/schema/index.js';
 import { CredentialsCipher } from './credentials.service.js';
 import { ServiceRegistry } from './registry/registry.js';
 import type { Service } from './registry/types.js';
@@ -38,7 +41,7 @@ interface Row {
 
 function setup(rows: Row[] = [], linkedProviders: string[] = []) {
   const inserted: { credentials?: string | null }[] = [];
-  let deletes = 0;
+  const deletedFrom: unknown[] = [];
 
   const db = {
     select: () => ({
@@ -55,11 +58,12 @@ function setup(rows: Row[] = [], linkedProviders: string[] = []) {
         return { onConflictDoUpdate: async () => undefined };
       },
     }),
-    delete: () => ({
+    delete: (table: unknown) => ({
       where: async () => {
-        deletes += 1;
+        deletedFrom.push(table);
       },
     }),
+    transaction: (run: (tx: Database) => Promise<void>) => run(db),
   } as unknown as Database;
 
   const subscriptions = new SubscriptionsService(
@@ -67,7 +71,7 @@ function setup(rows: Row[] = [], linkedProviders: string[] = []) {
     new ServiceRegistry([weather, github, jira]),
     cipher,
   );
-  return { subscriptions, inserted, deleted: () => deletes };
+  return { subscriptions, inserted, deletedFrom };
 }
 
 describe('SubscriptionsService', () => {
@@ -141,7 +145,7 @@ describe('SubscriptionsService', () => {
   });
 
   it('rejects an unknown service without touching the database', async () => {
-    const { subscriptions, inserted, deleted } = setup();
+    const { subscriptions, inserted, deletedFrom } = setup();
 
     await expect(
       subscriptions.subscribe('user-1', 'pizza', {}),
@@ -150,15 +154,35 @@ describe('SubscriptionsService', () => {
       /unknown service/i,
     );
     expect(inserted).toHaveLength(0);
-    expect(deleted()).toBe(0);
+    expect(deletedFrom).toHaveLength(0);
   });
 
-  it('deletes the subscription, and its credentials with it', async () => {
-    const { subscriptions, deleted } = setup();
+  it('deletes the subscription, its credentials and its widgets', async () => {
+    const { subscriptions, deletedFrom } = setup();
 
     await subscriptions.unsubscribe('user-1', 'jira');
 
-    expect(deleted()).toBe(1);
+    expect(deletedFrom).toEqual([widgetInstances, serviceSubscriptions]);
+  });
+
+  it('lists the widgets of each service, without their code', async () => {
+    const { subscriptions } = setup();
+
+    const [summary] = await subscriptions.list('user-1');
+
+    expect(summary.widgets).toEqual([]);
+    expect(JSON.stringify(summary)).not.toContain('getWidgetData');
+  });
+
+  it('tells whether a user is subscribed to a service', async () => {
+    expect(await setup().subscriptions.isSubscribed('user-1', 'jira')).toBe(
+      false,
+    );
+    expect(
+      await setup([
+        { serviceId: 'jira', credentials: null },
+      ]).subscriptions.isSubscribed('user-1', 'jira'),
+    ).toBe(true);
   });
 
   it('decrypts the credentials for the widgets only', async () => {
