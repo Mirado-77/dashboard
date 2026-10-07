@@ -14,9 +14,10 @@ import {
   serviceSubscriptions,
   widgetInstances,
 } from '../../database/schema/index.js';
+import { ProviderTokens } from '../services/provider-tokens.service.js';
 import { WidgetDataError } from '../services/registry/errors.js';
 import { ServiceRegistry } from '../services/registry/registry.js';
-import type { Widget } from '../services/registry/types.js';
+import type { Widget, WidgetContext } from '../services/registry/types.js';
 import { configFor, moveTo, refreshRateFor } from './widgets.rules.js';
 import { TtlCache } from '../../common/ttl-cache.js';
 
@@ -29,7 +30,6 @@ function cacheKey(
     Object.entries(config).sort(),
   )}`;
 }
-
 
 const widgetBodySchema = z.object({
   serviceId: z.string().trim(),
@@ -52,6 +52,7 @@ export class WidgetsService {
   constructor(
     @Inject(DATABASE) private readonly db: Database,
     private readonly registry: ServiceRegistry,
+    private readonly tokens: ProviderTokens,
   ) {}
 
   private widget(serviceId: string, widgetId: string): Widget {
@@ -234,12 +235,25 @@ export class WidgetsService {
     // Data of a service tied to an account must never be shared between users.
     const scope = service?.providerType === 'none' ? 'shared' : userId;
 
+    // Outside the try: a missing link is the user's to fix, not a 502.
+    const ctx: WidgetContext = { config };
+    if (service?.providerType === 'oauth') {
+      const token = await this.tokens.forService(userId, service);
+      if (!token) {
+        throw new BadRequestException({
+          code: 'PROVIDER_NOT_LINKED',
+          message: `Link your ${service.name} account again`,
+        });
+      }
+      ctx.accessToken = token.accessToken;
+    }
+
     try {
       return {
         data: await this.cache.get(
           cacheKey(scope, row, config),
           widget.minRefreshRate,
-          () => widget.getWidgetData({ config }),
+          () => widget.getWidgetData(ctx),
         ),
       };
     } catch (error) {
