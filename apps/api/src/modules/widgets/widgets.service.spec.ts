@@ -1,6 +1,7 @@
 import { BadRequestException, Logger, NotFoundException } from '@nestjs/common';
 import type { Database } from '../../database/database.module.js';
 import { serviceSubscriptions } from '../../database/schema/index.js';
+import type { ProviderTokens } from '../services/provider-tokens.service.js';
 import { WidgetDataError } from '../services/registry/errors.js';
 import { ServiceRegistry } from '../services/registry/registry.js';
 import type { Service, WidgetContext } from '../services/registry/types.js';
@@ -29,6 +30,24 @@ const weather: Service = {
   ],
 };
 
+const github: Service = {
+  id: 'github',
+  name: 'GitHub',
+  description: 'Your repositories',
+  providerType: 'oauth',
+  widgets: [
+    {
+      id: 'me',
+      name: 'Me',
+      description: 'Who the token belongs to',
+      params: [],
+      defaultRefreshRate: 300,
+      minRefreshRate: 60,
+      getWidgetData: (ctx) => getWidgetData(ctx),
+    },
+  ],
+};
+
 beforeAll(() => Logger.overrideLogger(false));
 beforeEach(() => {
   getWidgetData = async ({ config }) => ({ for: config });
@@ -42,6 +61,8 @@ interface State {
   owned?: Record<string, unknown>[];
   /** The whole dashboard in order, when it differs from `owned`. */
   ordered?: Record<string, unknown>[];
+  /** Access token of the linked account, null when it is not linked. */
+  token?: string | null;
 }
 
 function setup({
@@ -49,6 +70,7 @@ function setup({
   lastPosition = null,
   owned = [],
   ordered = owned,
+  token = null,
 }: State) {
   const inserted: Record<string, unknown>[] = [];
   /** Every `set` sent to the widget table, in order. */
@@ -102,8 +124,21 @@ function setup({
       }),
   } as unknown as Database;
 
+  const tokenCalls: unknown[][] = [];
+  const tokens = {
+    forService: async (...args: unknown[]) => {
+      tokenCalls.push(args);
+      return token ? { accessToken: token, expiresAt: null, scopes: [] } : null;
+    },
+  } as unknown as ProviderTokens;
+
   return {
-    widgets: new WidgetsService(db, new ServiceRegistry([weather])),
+    widgets: new WidgetsService(
+      db,
+      new ServiceRegistry([weather, github]),
+      tokens,
+    ),
+    tokenCalls,
     inserted,
     updates,
   };
@@ -283,5 +318,50 @@ describe('WidgetsService.data', () => {
     await expect(widgets.data('user-1', 'w-1')).rejects.toThrow(
       BadRequestException,
     );
+  });
+
+  const linked = {
+    id: 'w-2',
+    serviceId: 'github',
+    widgetId: 'me',
+    config: {},
+    refreshRate: 300,
+  };
+
+  it('gives the access token of the user to an oauth widget', async () => {
+    getWidgetData = async ({ accessToken }) => ({ calledWith: accessToken });
+    const { widgets, tokenCalls } = setup({
+      owned: [linked],
+      token: 'gh-token',
+    });
+
+    expect(await widgets.data('user-1', 'w-2')).toEqual({
+      data: { calledWith: 'gh-token' },
+    });
+    expect(tokenCalls).toEqual([['user-1', github]]);
+  });
+
+  it('asks to link the account when there is no token', async () => {
+    let called = false;
+    getWidgetData = async () => {
+      called = true;
+    };
+    const { widgets } = setup({ owned: [linked] });
+
+    await expect(widgets.data('user-1', 'w-2')).rejects.toMatchObject({
+      status: 400,
+      response: { code: 'PROVIDER_NOT_LINKED' },
+    });
+    expect(called).toBe(false);
+  });
+
+  it('asks for no token for a service without account', async () => {
+    getWidgetData = async (ctx) => ({ keys: Object.keys(ctx) });
+    const { widgets, tokenCalls } = setup({ owned: [row], token: 'gh-token' });
+
+    expect(await widgets.data('user-1', 'w-1')).toEqual({
+      data: { keys: ['config'] },
+    });
+    expect(tokenCalls).toHaveLength(0);
   });
 });
