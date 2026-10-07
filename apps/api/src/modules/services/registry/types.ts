@@ -3,6 +3,7 @@ export type ProviderType = 'none' | 'oauth' | 'credentials';
 
 export interface WidgetContext {
   config: Record<string, string | number>;
+  accessToken?: string;
 }
 
 export interface WidgetParam {
