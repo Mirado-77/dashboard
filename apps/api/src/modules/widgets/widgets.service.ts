@@ -18,6 +18,18 @@ import { WidgetDataError } from '../services/registry/errors.js';
 import { ServiceRegistry } from '../services/registry/registry.js';
 import type { Widget } from '../services/registry/types.js';
 import { configFor, moveTo, refreshRateFor } from './widgets.rules.js';
+import { TtlCache } from '../../common/ttl-cache.js';
+
+function cacheKey(
+  scope: string,
+  row: { serviceId: string; widgetId: string },
+  config: Record<string, string | number>,
+): string {
+  return `${scope}:${row.serviceId}/${row.widgetId}:${JSON.stringify(
+    Object.entries(config).sort(),
+  )}`;
+}
+
 
 const widgetBodySchema = z.object({
   serviceId: z.string().trim(),
@@ -35,6 +47,7 @@ const widgetUpdateSchema = z.object({
 @Injectable()
 export class WidgetsService {
   private readonly logger = new Logger(WidgetsService.name);
+  private readonly cache = new TtlCache<unknown>();
 
   constructor(
     @Inject(DATABASE) private readonly db: Database,
@@ -217,9 +230,18 @@ export class WidgetsService {
     const row = await this.instance(userId, id);
     const widget = this.widget(row.serviceId, row.widgetId);
     const config = configFor(widget, row.config);
+    const service = this.registry.getOne(row.serviceId);
+    // Data of a service tied to an account must never be shared between users.
+    const scope = service?.providerType === 'none' ? 'shared' : userId;
 
     try {
-      return { data: await widget.getWidgetData({ config }) };
+      return {
+        data: await this.cache.get(
+          cacheKey(scope, row, config),
+          widget.minRefreshRate,
+          () => widget.getWidgetData({ config }),
+        ),
+      };
     } catch (error) {
       const known = error instanceof WidgetDataError;
       if (!known) {

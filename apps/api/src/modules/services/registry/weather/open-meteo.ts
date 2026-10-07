@@ -6,10 +6,15 @@
 */
 
 import { WidgetDataError } from '../errors.js';
+import { TtlCache } from '../../../../common/ttl-cache.js';
 
 const GEOCODING_URL = 'https://geocoding-api.open-meteo.com/v1/search';
 const FORECAST_URL = 'https://api.open-meteo.com/v1/forecast';
 const TIMEOUT_MS = 5000;
+
+const places = new TtlCache<Place>();
+const ONE_DAY = 24 * 60 * 60;
+
 
 export interface OpenMeteoForecast {
   current: {
@@ -37,13 +42,16 @@ async function getJson<T>(url: URL): Promise<T> {
 export interface Place { name: string; country: string; latitude: number; longitude: number }
 
 export async function findCity(city: string): Promise<Place> {
-  const url = new URL(GEOCODING_URL);
-  url.searchParams.set('name', city);
-  url.searchParams.set('count', '1');
-  const data = await getJson<{ results?: Place[] }>(url);
-  const place = data.results?.[0];
-  if (!place) throw new WidgetDataError(`Unknown city: ${city}`);
-  return place;
+  return places.get(city.trim().toLowerCase(), ONE_DAY, async () => {
+    const url = new URL(GEOCODING_URL);
+    url.searchParams.set('name', city);
+    url.searchParams.set('count', '1');
+    const data = await getJson<{ results?: Place[] }>(url);
+    const place = data.results?.[0];
+    if (!place)
+      throw new WidgetDataError(`Unknown city: ${city}`);
+    return place;
+  });
 }
 
 export async function getForecast(place: Place, days: number) {
