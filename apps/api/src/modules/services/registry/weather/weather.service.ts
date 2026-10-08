@@ -1,9 +1,9 @@
 /*
-** EPITECH PROJECT, 2026
-** G-WEB-500-PAR-5-1-dashboard-10
-** File description:
-** weather.service
-*/
+ ** EPITECH PROJECT, 2026
+ ** G-WEB-500-PAR-5-1-dashboard-10
+ ** File description:
+ ** weather.service
+ */
 
 import type { Service } from './../types.js';
 import { findCity, getForecast } from './open-meteo.js';
@@ -43,7 +43,7 @@ export const weather: Service = {
       ],
       defaultRefreshRate: 1800,
       minRefreshRate: 300,
-      async getWidgetData({ config}) {
+      async getWidgetData({ config }) {
         const days = Math.min(Math.max(Number(config.days), 1), 16); // limite de l'API
         const place = await findCity(String(config.city));
         const { daily } = await getForecast(place, days);

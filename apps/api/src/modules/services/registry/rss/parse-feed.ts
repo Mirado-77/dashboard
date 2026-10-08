@@ -1,9 +1,9 @@
 /*
-** EPITECH PROJECT, 2026
-** G-WEB-500-PAR-5-1-dashboard-10
-** File description:
-** parse-feed
-*/
+ ** EPITECH PROJECT, 2026
+ ** G-WEB-500-PAR-5-1-dashboard-10
+ ** File description:
+ ** parse-feed
+ */
 
 import { XMLParser } from 'fast-xml-parser';
 import { WidgetDataError } from '../errors.js';
@@ -105,18 +105,21 @@ const ENTITIES: Record<string, string> = {
 };
 
 function decodeEntities(value: string): string {
-  return value.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (match, entity: string) => {
-    if (entity[0] === '#') {
-      const code =
-        entity[1].toLowerCase() === 'x'
-          ? parseInt(entity.slice(2), 16)
-          : parseInt(entity.slice(1), 10);
-      return Number.isFinite(code) && code <= 0x10ffff
-        ? String.fromCodePoint(code)
-        : match;
-    }
-    return ENTITIES[entity.toLowerCase()] ?? match;
-  });
+  return value.replace(
+    /&(#x[0-9a-f]+|#\d+|[a-z]+);/gi,
+    (match, entity: string) => {
+      if (entity[0] === '#') {
+        const code =
+          entity[1].toLowerCase() === 'x'
+            ? parseInt(entity.slice(2), 16)
+            : parseInt(entity.slice(1), 10);
+        return Number.isFinite(code) && code <= 0x10ffff
+          ? String.fromCodePoint(code)
+          : match;
+      }
+      return ENTITIES[entity.toLowerCase()] ?? match;
+    },
+  );
 }
 
 function toSummary(value: unknown): string | null {

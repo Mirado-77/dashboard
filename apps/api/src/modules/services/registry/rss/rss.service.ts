@@ -1,9 +1,9 @@
 /*
-** EPITECH PROJECT, 2026
-** G-WEB-500-PAR-5-1-dashboard-10
-** File description:
-** rss.service
-*/
+ ** EPITECH PROJECT, 2026
+ ** G-WEB-500-PAR-5-1-dashboard-10
+ ** File description:
+ ** rss.service
+ */
 
 import type { Service } from '../types.js';
 import { parseFeed, type FeedItem } from './parse-feed.js';
@@ -40,7 +40,10 @@ export const rss: Service = {
       defaultRefreshRate: 900,
       minRefreshRate: 300,
       async getWidgetData({ config }) {
-        const limit = Math.min(Math.max(Number(config.limit) || 5, 1), MAX_ITEMS);
+        const limit = Math.min(
+          Math.max(Number(config.limit) || 5, 1),
+          MAX_ITEMS,
+        );
         const feed = await loadFeed(config.url);
         return { title: feed.title, items: feed.items.slice(0, limit) };
       },
