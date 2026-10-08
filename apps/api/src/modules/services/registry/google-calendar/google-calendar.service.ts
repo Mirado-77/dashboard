@@ -27,5 +27,25 @@ export const googleCalendar: Service = {
         return listEvents(accessToken, { from: start, to: period, max: 20 });
       },
     },
+    {
+      id: 'today_events',
+      name: "Today's event",
+      description: "Display today's event",
+      params: [
+        { name: 'limit', type: 'integer', required: false, defaultValue: 5 },
+      ],
+      defaultRefreshRate: 600,
+      minRefreshRate: 60,
+      async getWidgetData({ config, accessToken }) {
+        const start = new Date();
+        start.setHours(0, 0, 0, 0);
+
+        const end = new Date(start);
+        end.setDate(start.getDate() + 1);
+        const max = Number(config.limit);
+
+        return listEvents(accessToken, { from: start, to: end, max: max });
+      },
+    },
   ],
 };
