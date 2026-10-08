@@ -1,3 +1,4 @@
+import { CalendarEvents, type CalendarEvent } from "./calendar-events";
 import { RssArticleList, RssLatestArticle, type ArticleListData, type LatestArticleData } from "./rss-articles";
 import { WeatherForecast, type ForecastData } from "./weather-forecast";
 import { WeatherTemperature, type CityTemperatureData } from "./weather-temperature";
@@ -21,6 +22,10 @@ export function WidgetView({
       return <RssArticleList data={data as ArticleListData} />;
     case "rss/latest_article":
       return <RssLatestArticle data={data as LatestArticleData} />;
+    case "google-calendar/upcoming_events":
+      return <CalendarEvents data={data as CalendarEvent[]} showDay />;
+    case "google-calendar/today_events":
+      return <CalendarEvents data={data as CalendarEvent[]} showDay={false} />;
     default:
       return <p className="text-sm text-muted-foreground">This widget has no display yet.</p>;
   }
