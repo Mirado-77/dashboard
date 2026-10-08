@@ -18,7 +18,7 @@ export interface LatestArticleData {
 }
 
 /** Only http(s) links: a feed could hand out `javascript:` ones. */
-function safeLink(link: string | null): string | null {
+export function safeLink(link: string | null): string | null {
   if (!link) return null;
   try {
     const url = new URL(link);
