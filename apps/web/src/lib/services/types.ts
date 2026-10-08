@@ -32,9 +32,16 @@ export interface ServiceSummary {
   name: string;
   description: string;
   providerType: ProviderType;
+  oauthProviderId: string;
+  oauthScopes: string[];
   credentialFields?: CredentialField[];
   widgets: WidgetSummary[];
+  /** Always false for a service that needs no account: it has no subscription. */
   subscribed: boolean;
+  /** Its widgets can be added: available by default, or subscribed. */
+  available: boolean;
+  /** For an `oauth` service, the linked account granted every scope it needs. */
+  accessGranted: boolean;
   /** Whether credentials are stored, never what they contain. */
   hasCredentials: boolean;
 }

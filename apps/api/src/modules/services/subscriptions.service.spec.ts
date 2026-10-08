@@ -35,7 +35,12 @@ const weather = service({
     },
   ],
 });
-const github = service({ id: 'github', name: 'GitHub', providerType: 'oauth' });
+const github = service({
+  id: 'github',
+  name: 'GitHub',
+  providerType: 'oauth',
+  oauthScopes: ['repo:status'],
+});
 const jira = service({
   id: 'jira',
   name: 'Jira',
@@ -48,7 +53,10 @@ interface Row {
   credentials: string | null;
 }
 
-function setup(rows: Row[] = [], linkedProviders: string[] = []) {
+/** Linked accounts, by provider, with the scopes they granted. */
+type Linked = Record<string, string>;
+
+function setup(rows: Row[] = [], linked: Linked = {}) {
   const inserted: { credentials?: string | null }[] = [];
   const deletedFrom: unknown[] = [];
 
@@ -58,7 +66,10 @@ function setup(rows: Row[] = [], linkedProviders: string[] = []) {
         where: async () =>
           table === serviceSubscriptions
             ? rows
-            : linkedProviders.map((id) => ({ id })),
+            : Object.entries(linked).map(([providerId, scope]) => ({
+                providerId,
+                scope,
+              })),
       }),
     }),
     insert: () => ({
@@ -86,16 +97,45 @@ describe('SubscriptionsService', () => {
   it('lists every service and says which ones are subscribed', async () => {
     const { subscriptions } = setup([
       { serviceId: 'jira', credentials: cipher.encrypt({ apiToken: 'x' }) },
-      { serviceId: 'weather', credentials: null },
     ]);
 
     const list = await subscriptions.list('user-1');
 
-    expect(list.map((s) => [s.id, s.subscribed, s.hasCredentials])).toEqual([
-      ['weather', true, false],
-      ['github', false, false],
-      ['jira', true, true],
+    expect(
+      list.map((s) => [s.id, s.subscribed, s.available, s.hasCredentials]),
+    ).toEqual([
+      ['weather', false, true, false],
+      ['github', false, false, false],
+      ['jira', true, true, true],
     ]);
+  });
+
+  it('makes a service without account available by default', async () => {
+    // A subscription left from before the service became available by default.
+    const { subscriptions } = setup([
+      { serviceId: 'weather', credentials: null },
+    ]);
+
+    const [weatherSummary] = await subscriptions.list('user-1');
+
+    expect(weatherSummary).toMatchObject({
+      subscribed: false,
+      available: true,
+    });
+  });
+
+  it('says whether the linked account granted the scopes of a service', async () => {
+    const granted = await setup([], {
+      github: 'read:user,repo:status',
+    }).subscriptions.list('user-1');
+    const missing = await setup([], { github: 'read:user' }).subscriptions.list(
+      'user-1',
+    );
+    const unlinked = await setup().subscriptions.list('user-1');
+
+    expect(
+      [granted, missing, unlinked].map((list) => list[1].accessGranted),
+    ).toEqual([true, false, false]);
   });
 
   it('never exposes the stored credentials', async () => {
@@ -126,13 +166,21 @@ describe('SubscriptionsService', () => {
     });
   });
 
-  it('stores no credentials for a service that needs none', async () => {
-    const { subscriptions, inserted } = setup();
+  it('refuses to subscribe to or unsubscribe from a service available by default', async () => {
+    const { subscriptions, inserted, deletedFrom } = setup();
 
-    const summary = await subscriptions.subscribe('user-1', 'weather', {});
-
-    expect(summary.hasCredentials).toBe(false);
-    expect(inserted[0].credentials).toBeNull();
+    await expect(
+      subscriptions.subscribe('user-1', 'weather', {}),
+    ).rejects.toMatchObject({
+      response: { code: 'NO_SUBSCRIPTION_NEEDED' },
+    });
+    await expect(
+      subscriptions.unsubscribe('user-1', 'weather'),
+    ).rejects.toMatchObject({
+      response: { code: 'NO_SUBSCRIPTION_NEEDED' },
+    });
+    expect(inserted).toHaveLength(0);
+    expect(deletedFrom).toHaveLength(0);
   });
 
   it('refuses an oauth service while the provider is not linked', async () => {
@@ -145,7 +193,9 @@ describe('SubscriptionsService', () => {
   });
 
   it('accepts an oauth service once the provider is linked', async () => {
-    const { subscriptions, inserted } = setup([], ['github']);
+    const { subscriptions, inserted } = setup([], {
+      github: 'read:user,repo:status',
+    });
 
     await subscriptions.subscribe('user-1', 'github', {});
 

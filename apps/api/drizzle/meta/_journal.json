@@ -29,6 +29,13 @@
       "when": 1790941669925,
       "tag": "0003_widget_instance",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1791456881735,
+      "tag": "0004_widget_without_subscription",
+      "breakpoints": true
     }
   ]
 }

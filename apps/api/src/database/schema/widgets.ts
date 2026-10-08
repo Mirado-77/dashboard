@@ -7,7 +7,8 @@ import { serviceSubscriptions } from './services.js';
  * A widget the user placed on their dashboard.
  *
  * Tied to the subscription so that unsubscribing from a service removes its
- * widgets. `serviceId` and `widgetId` are checked against the registry, like
+ * widgets. Null for a service that needs no account: it has no subscription.
+ * `serviceId` and `widgetId` are checked against the registry, like
  * subscriptions.
  *
  * `position` is the index in the dashboard order, as `@dnd-kit/sortable`
@@ -20,9 +21,10 @@ export const widgetInstances = pgTable(
     userId: text('user_id')
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
-    subscriptionId: text('subscription_id')
-      .notNull()
-      .references(() => serviceSubscriptions.id, { onDelete: 'cascade' }),
+    subscriptionId: text('subscription_id').references(
+      () => serviceSubscriptions.id,
+      { onDelete: 'cascade' },
+    ),
     serviceId: text('service_id').notNull(),
     widgetId: text('widget_id').notNull(),
     config: jsonb('config').$type<Record<string, string | number>>().notNull(),

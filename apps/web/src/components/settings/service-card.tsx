@@ -1,23 +1,41 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Field, FormError } from "@/components/auth/field";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { authClient } from "@/lib/auth/client";
 import { servicesClient } from "@/lib/services/client";
 import type { ServiceSummary } from "@/lib/services/types";
 
 const PROVIDER_NOT_LINKED = "PROVIDER_NOT_LINKED";
+const PROVIDER_SCOPE_MISSING = "PROVIDER_SCOPE_MISSING";
+const SERVICES_PAGE = "/settings/services";
 
-export function ServiceCard({ service }: { service: ServiceSummary }) {
+function statusOf(service: ServiceSummary): { label: string; active: boolean } {
+  if (service.providerType === "none") return { label: "Available by default", active: true };
+  return service.subscribed
+    ? { label: "Subscribed", active: true }
+    : { label: "Not subscribed", active: false };
+}
+
+export function ServiceCard({
+  service,
+  autoSubscribe = false,
+}: {
+  service: ServiceSummary;
+  /** Back from the provider, where the user granted access: finish the subscription. */
+  autoSubscribe?: boolean;
+}) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [needsLink, setNeedsLink] = useState(false);
+  const autoSubscribed = useRef(false);
   const fields = service.credentialFields ?? [];
+  const status = statusOf(service);
 
   async function subscribe(credentials: Record<string, string> = {}) {
     setPending(true);
@@ -29,10 +47,24 @@ export function ServiceCard({ service }: { service: ServiceSummary }) {
 
     if (error) {
       setError(error.message);
-      setNeedsLink(error.code === PROVIDER_NOT_LINKED);
+      setNeedsLink(error.code === PROVIDER_NOT_LINKED || error.code === PROVIDER_SCOPE_MISSING);
       return;
     }
     router.refresh();
+  }
+
+  async function grantAccess() {
+    setPending(true);
+    setError(null);
+    const { error } = await authClient.linkSocial({
+      provider: service.oauthProviderId,
+      scopes: service.oauthScopes,
+      callbackURL: `${SERVICES_PAGE}?subscribe=${encodeURIComponent(service.id)}`,
+    });
+    if (error) {
+      setError(error.message);
+      setPending(false);
+    }
   }
 
   async function unsubscribe() {
@@ -49,6 +81,22 @@ export function ServiceCard({ service }: { service: ServiceSummary }) {
     router.refresh();
   }
 
+  useEffect(() => {
+    if (!autoSubscribe || autoSubscribed.current) return;
+    autoSubscribed.current = true;
+    // Drops `?subscribe=` so that a reload does not subscribe again.
+    router.replace(SERVICES_PAGE);
+    if (service.subscribed || !service.accessGranted) return;
+
+    void servicesClient.subscribe(service.id).then(({ error }) => {
+      if (error) {
+        setError(error.message);
+        return;
+      }
+      router.refresh();
+    });
+  }, [autoSubscribe, router, service.id, service.subscribed, service.accessGranted]);
+
   function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
@@ -58,6 +106,9 @@ export function ServiceCard({ service }: { service: ServiceSummary }) {
     void subscribe(credentials);
   }
 
+  const canGrant =
+    service.providerType === "oauth" && !service.subscribed && (!service.accessGranted || needsLink);
+
   return (
     <Card>
       <CardHeader>
@@ -66,12 +117,16 @@ export function ServiceCard({ service }: { service: ServiceSummary }) {
             <CardTitle>{service.name}</CardTitle>
             <CardDescription>{service.description}</CardDescription>
           </div>
-          <Badge variant={service.subscribed ? "default" : "secondary"}>
-            {service.subscribed ? "Subscribed" : "Not subscribed"}
-          </Badge>
+          <Badge variant={status.active ? "default" : "secondary"}>{status.label}</Badge>
         </div>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
+        {service.providerType === "none" && (
+          <p className="text-sm text-muted-foreground">
+            No account needed: its widgets are already available on your dashboard.
+          </p>
+        )}
+
         {service.providerType === "credentials" && !service.subscribed && (
           <form onSubmit={onSubmit} className="flex flex-col gap-4">
             {fields.map((field) => (
@@ -98,30 +153,31 @@ export function ServiceCard({ service }: { service: ServiceSummary }) {
           </p>
         )}
 
-        {service.providerType === "oauth" && !service.subscribed && (
+        {canGrant && (
           <p className="text-sm text-muted-foreground">
-            This service uses your linked {service.name} account.
+            This service reads your data from your linked account. Allow it first, then you will be
+            subscribed.
           </p>
-        )}
-
-        {needsLink && (
-          <Button variant="outline" size="sm" className="self-start" asChild>
-            <Link href="/settings/accounts">Link my {service.name} account</Link>
-          </Button>
         )}
 
         <FormError message={error} />
 
-        {service.subscribed ? (
+        {canGrant && (
+          <Button size="sm" className="self-start" onClick={grantAccess} disabled={pending}>
+            {pending ? "Please wait…" : `Allow access to ${service.name}`}
+          </Button>
+        )}
+
+        {service.providerType === "oauth" && !service.subscribed && !canGrant && (
+          <Button size="sm" className="self-start" onClick={() => subscribe()} disabled={pending}>
+            {pending ? "Please wait…" : "Subscribe"}
+          </Button>
+        )}
+
+        {service.providerType !== "none" && service.subscribed && (
           <Button variant="outline" size="sm" className="self-start" onClick={unsubscribe} disabled={pending}>
             {pending ? "Please wait…" : "Unsubscribe"}
           </Button>
-        ) : (
-          service.providerType !== "credentials" && (
-            <Button size="sm" className="self-start" onClick={() => subscribe()} disabled={pending}>
-              {pending ? "Please wait…" : "Subscribe"}
-            </Button>
-          )
         )}
       </CardContent>
     </Card>
