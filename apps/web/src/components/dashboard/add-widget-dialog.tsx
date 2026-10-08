@@ -34,7 +34,7 @@ export function AddWidgetDialog({
   const [choice, setChoice] = useState<Choice | null>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const subscribed = services.filter((service) => service.subscribed && service.widgets.length > 0);
+  const available = services.filter((service) => service.available && service.widgets.length > 0);
 
   function onOpenChange(next: boolean) {
     setOpen(next);
@@ -80,7 +80,7 @@ export function AddWidgetDialog({
               <DialogTitle>Add a widget</DialogTitle>
               <DialogDescription>Choose the type of widget.</DialogDescription>
             </DialogHeader>
-            {subscribed.length === 0 ? (
+            {available.length === 0 ? (
               <p className="text-sm text-muted-foreground">
                 Subscribe to a service first on the{" "}
                 <Link href="/settings/services" className="underline underline-offset-4">
@@ -90,7 +90,7 @@ export function AddWidgetDialog({
               </p>
             ) : (
               <div className="flex flex-col gap-4">
-                {subscribed.map((service) => (
+                {available.map((service) => (
                   <section key={service.id} className="flex flex-col gap-2">
                     <h3 className="text-sm font-medium">{service.name}</h3>
                     {service.widgets.map((widget) => (

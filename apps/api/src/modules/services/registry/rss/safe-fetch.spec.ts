@@ -106,8 +106,6 @@ describe('safeFetch', () => {
   it('only throws WidgetDataError', async () => {
     fetchMock.mockRejectedValue(new TypeError('fetch failed'));
 
-    await expect(safeFetch(PUBLIC_URL)).rejects.toBeInstanceOf(
-      WidgetDataError,
-    );
+    await expect(safeFetch(PUBLIC_URL)).rejects.toBeInstanceOf(WidgetDataError);
   });
 });

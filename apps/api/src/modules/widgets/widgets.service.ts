@@ -5,6 +5,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { and, asc, eq, gt, max, sql } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
@@ -17,9 +18,14 @@ import {
 import { ProviderTokens } from '../services/provider-tokens.service.js';
 import { WidgetDataError } from '../services/registry/errors.js';
 import { ServiceRegistry } from '../services/registry/registry.js';
-import type { Widget, WidgetContext } from '../services/registry/types.js';
+import type {
+  Service,
+  Widget,
+  WidgetContext,
+} from '../services/registry/types.js';
 import { configFor, moveTo, refreshRateFor } from './widgets.rules.js';
 import { TtlCache } from '../../common/ttl-cache.js';
+import { AuthError } from '../auth/custom/errors.js';
 
 function cacheKey(
   scope: string,
@@ -66,6 +72,49 @@ export class WidgetsService {
     return widget;
   }
 
+  /** Null for a service available by default, which has no subscription. */
+  private async subscriptionFor(
+    userId: string,
+    serviceId: string,
+  ): Promise<string | null> {
+    if (this.registry.getOne(serviceId)?.providerType === 'none') return null;
+
+    const [subscription] = await this.db
+      .select({ id: serviceSubscriptions.id })
+      .from(serviceSubscriptions)
+      .where(
+        and(
+          eq(serviceSubscriptions.userId, userId),
+          eq(serviceSubscriptions.serviceId, serviceId),
+        ),
+      );
+    if (!subscription) {
+      throw new BadRequestException({
+        code: 'NOT_SUBSCRIBED',
+        message: 'Subscribe to this service first',
+      });
+    }
+    return subscription.id;
+  }
+
+  /** A refresh token Google or GitHub no longer accepts is a 401, not a 500. */
+  private async tokenFor(userId: string, service: Service) {
+    try {
+      return await this.tokens.forService(userId, service);
+    } catch (error) {
+      if (
+        error instanceof AuthError &&
+        error.code === 'PROVIDER_REAUTH_REQUIRED'
+      ) {
+        throw new UnauthorizedException({
+          code: error.code,
+          message: error.message,
+        });
+      }
+      throw error;
+    }
+  }
+
   /** Someone else's widget gets the same 404 as a missing one. */
   private async instance(userId: string, id: string) {
     const [row] = await this.db
@@ -105,22 +154,7 @@ export class WidgetsService {
     }
     const input = result.data;
     const widget = this.widget(input.serviceId, input.widgetId);
-
-    const [subscription] = await this.db
-      .select({ id: serviceSubscriptions.id })
-      .from(serviceSubscriptions)
-      .where(
-        and(
-          eq(serviceSubscriptions.userId, userId),
-          eq(serviceSubscriptions.serviceId, input.serviceId),
-        ),
-      );
-    if (!subscription) {
-      throw new BadRequestException({
-        code: 'NOT_SUBSCRIBED',
-        message: 'Subscribe to this service first',
-      });
-    }
+    const subscriptionId = await this.subscriptionFor(userId, input.serviceId);
 
     const config = configFor(widget, input.config);
     const refreshRate = refreshRateFor(widget, input.refreshRate);
@@ -135,7 +169,7 @@ export class WidgetsService {
       .values({
         id: randomUUID(),
         userId,
-        subscriptionId: subscription.id,
+        subscriptionId,
         serviceId: input.serviceId,
         widgetId: input.widgetId,
         config,
@@ -238,7 +272,7 @@ export class WidgetsService {
     // Outside the try: a missing link is the user's to fix, not a 502.
     const ctx: WidgetContext = { config };
     if (service?.providerType === 'oauth') {
-      const token = await this.tokens.forService(userId, service);
+      const token = await this.tokenFor(userId, service);
       if (!token) {
         throw new BadRequestException({
           code: 'PROVIDER_NOT_LINKED',

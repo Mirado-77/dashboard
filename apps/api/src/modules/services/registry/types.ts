@@ -38,6 +38,8 @@ export interface Service {
   providerType: ProviderType;
   /** Provider of the linked account, for `oauth` services. Defaults to `id`. */
   oauthProviderId?: string;
+  /** Scopes the linked account must have granted, for oauth services. */
+  oauthScopes?: string[];
   /** Fields to fill in, for `credentials` services. */
   credentialFields?: CredentialField[];
   widgets: Widget[];

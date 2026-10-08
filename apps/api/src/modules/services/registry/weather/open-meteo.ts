@@ -1,9 +1,9 @@
 /*
-** EPITECH PROJECT, 2026
-** G-WEB-500-PAR-5-1-dashboard-10
-** File description:
-** open-meteo
-*/
+ ** EPITECH PROJECT, 2026
+ ** G-WEB-500-PAR-5-1-dashboard-10
+ ** File description:
+ ** open-meteo
+ */
 
 import { WidgetDataError } from '../errors.js';
 import { TtlCache } from '../../../../common/ttl-cache.js';
@@ -14,7 +14,6 @@ const TIMEOUT_MS = 5000;
 
 const places = new TtlCache<Place>();
 const ONE_DAY = 24 * 60 * 60;
-
 
 export interface OpenMeteoForecast {
   current: {
@@ -32,14 +31,21 @@ export interface OpenMeteoForecast {
 }
 
 async function getJson<T>(url: URL): Promise<T> {
-  const response = await fetch(url, { signal: AbortSignal.timeout(TIMEOUT_MS) });
+  const response = await fetch(url, {
+    signal: AbortSignal.timeout(TIMEOUT_MS),
+  });
   if (!response.ok) {
     throw new WidgetDataError(`Open-Meteo answered ${response.status}`);
   }
   return (await response.json()) as T;
 }
 
-export interface Place { name: string; country: string; latitude: number; longitude: number }
+export interface Place {
+  name: string;
+  country: string;
+  latitude: number;
+  longitude: number;
+}
 
 export async function findCity(city: string): Promise<Place> {
   return places.get(city.trim().toLowerCase(), ONE_DAY, async () => {
@@ -48,8 +54,7 @@ export async function findCity(city: string): Promise<Place> {
     url.searchParams.set('count', '1');
     const data = await getJson<{ results?: Place[] }>(url);
     const place = data.results?.[0];
-    if (!place)
-      throw new WidgetDataError(`Unknown city: ${city}`);
+    if (!place) throw new WidgetDataError(`Unknown city: ${city}`);
     return place;
   });
 }
@@ -59,7 +64,10 @@ export async function getForecast(place: Place, days: number) {
   url.searchParams.set('latitude', String(place.latitude));
   url.searchParams.set('longitude', String(place.longitude));
   url.searchParams.set('current', 'temperature_2m,weather_code,wind_speed_10m');
-  url.searchParams.set('daily', 'temperature_2m_max,temperature_2m_min,weather_code');
+  url.searchParams.set(
+    'daily',
+    'temperature_2m_max,temperature_2m_min,weather_code',
+  );
   url.searchParams.set('forecast_days', String(days));
   url.searchParams.set('timezone', 'auto');
   return getJson<OpenMeteoForecast>(url);

@@ -5,6 +5,7 @@ import type { ProviderTokens } from '../services/provider-tokens.service.js';
 import { WidgetDataError } from '../services/registry/errors.js';
 import { ServiceRegistry } from '../services/registry/registry.js';
 import type { Service, WidgetContext } from '../services/registry/types.js';
+import { Errors } from '../auth/custom/errors.js';
 import { WidgetsService } from './widgets.service.js';
 
 let getWidgetData: (ctx: WidgetContext) => Promise<unknown>;
@@ -63,6 +64,8 @@ interface State {
   ordered?: Record<string, unknown>[];
   /** Access token of the linked account, null when it is not linked. */
   token?: string | null;
+  /** Thrown when the token is asked for, e.g. a refused refresh. */
+  tokenError?: Error;
 }
 
 function setup({
@@ -71,6 +74,7 @@ function setup({
   owned = [],
   ordered = owned,
   token = null,
+  tokenError,
 }: State) {
   const inserted: Record<string, unknown>[] = [];
   /** Every `set` sent to the widget table, in order. */
@@ -128,6 +132,7 @@ function setup({
   const tokens = {
     forService: async (...args: unknown[]) => {
       tokenCalls.push(args);
+      if (tokenError) throw tokenError;
       return token ? { accessToken: token, expiresAt: null, scopes: [] } : null;
     },
   } as unknown as ProviderTokens;
@@ -158,7 +163,6 @@ describe('WidgetsService.create', () => {
 
     expect(inserted[0]).toMatchObject({
       userId: 'user-1',
-      subscriptionId: 'sub-1',
       config: { city: 'Paris', days: 3 },
       refreshRate: 300,
       position: 0,
@@ -189,12 +193,39 @@ describe('WidgetsService.create', () => {
     ).rejects.toThrow(NotFoundException);
   });
 
+  it('needs no subscription for a service available by default', async () => {
+    const { widgets, inserted } = setup({ subscribed: false });
+
+    await widgets.create('user-1', valid);
+
+    expect(inserted[0].subscriptionId).toBeNull();
+  });
+
+  it('ties a widget to the subscription of its service', async () => {
+    const { widgets, inserted } = setup({});
+
+    await widgets.create('user-1', {
+      serviceId: 'github',
+      widgetId: 'me',
+      config: {},
+    });
+
+    expect(inserted[0].subscriptionId).toBe('sub-1');
+  });
+
   it('rejects a widget of a service the user is not subscribed to', async () => {
     const { widgets, inserted } = setup({ subscribed: false });
 
-    await expect(widgets.create('user-1', valid)).rejects.toThrow(
-      BadRequestException,
-    );
+    await expect(
+      widgets.create('user-1', {
+        serviceId: 'github',
+        widgetId: 'me',
+        config: {},
+      }),
+    ).rejects.toMatchObject({
+      status: 400,
+      response: { code: 'NOT_SUBSCRIBED' },
+    });
     expect(inserted).toHaveLength(0);
   });
 });
@@ -353,6 +384,28 @@ describe('WidgetsService.data', () => {
       response: { code: 'PROVIDER_NOT_LINKED' },
     });
     expect(called).toBe(false);
+  });
+
+  it('asks to reconnect the account when its token cannot be refreshed', async () => {
+    const { widgets } = setup({
+      owned: [linked],
+      tokenError: Errors.providerReauthRequired('github'),
+    });
+
+    await expect(widgets.data('user-1', 'w-2')).rejects.toMatchObject({
+      status: 401,
+      response: {
+        code: 'PROVIDER_REAUTH_REQUIRED',
+        message: 'Reconnect your github account',
+      },
+    });
+  });
+
+  it('lets any other token failure through', async () => {
+    const failure = new Error('database down');
+    const { widgets } = setup({ owned: [linked], tokenError: failure });
+
+    await expect(widgets.data('user-1', 'w-2')).rejects.toBe(failure);
   });
 
   it('asks for no token for a service without account', async () => {
