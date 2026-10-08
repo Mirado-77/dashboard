@@ -22,7 +22,6 @@ async function gh<T>(path: string, accessToken?: string): Promise<T> {
   if (response.status === 401) {
     throw new WidgetDataError('Link your GitHub account again');
   }
-  // The search API answers 422 for a repository it cannot see.
   if (response.status === 404 || response.status === 422) {
     throw new WidgetDataError('Repository not found');
   }
@@ -35,7 +34,6 @@ async function gh<T>(path: string, accessToken?: string): Promise<T> {
   return (await response.json()) as T;
 }
 
-/** `owner/name`, checked so that nothing else ends up in the URL. */
 export function parseRepo(value: unknown): string {
   const repo = String(value).trim();
   if (!/^[\w.-]+\/[\w.-]+$/.test(repo)) {
@@ -59,7 +57,6 @@ export async function getCommits(repo: string, limit: number, token?: string) {
   return commits.map((item) => ({
     sha: item.sha.slice(0, 7),
     url: item.html_url,
-    // First line only: the rest is the body of the commit message.
     message: item.commit.message.split('\n')[0],
     author: item.author?.login ?? item.commit.author?.name ?? null,
     date: item.commit.author?.date ?? null,
@@ -76,7 +73,6 @@ interface GitHubIssue {
   draft?: boolean;
 }
 
-/** Open issues or pull requests, newest first, with how many there are. */
 export async function getOpen(
   kind: 'issue' | 'pr',
   repo: string,
