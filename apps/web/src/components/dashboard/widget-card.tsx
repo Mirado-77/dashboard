@@ -1,7 +1,6 @@
 "use client";
 
-import { useSortable } from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
+import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { GripVertical, RefreshCw, Settings2, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { WidgetView } from "@/components/widgets/widget-view";
@@ -10,11 +9,18 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { ServiceSummary, WidgetSummary } from "@/lib/services/types";
+import type { WidgetSize } from "@/lib/widgets/catalog";
 import type { WidgetInstance } from "@/lib/widgets/types";
 import { cn } from "@/lib/utils";
 import { DeleteWidgetDialog } from "./delete-widget-dialog";
 import { EditWidgetDialog } from "./edit-widget-dialog";
 import { useWidgetData } from "./use-widget-data";
+
+const SIZE_CLASSES: Record<WidgetSize, string> = {
+  small: "",
+  tall: "row-span-2",
+  large: "row-span-2 md:col-span-2",
+};
 
 function formatRate(seconds: number): string {
   if (seconds % 3600 === 0) return `${seconds / 3600} h`;
@@ -22,7 +28,7 @@ function formatRate(seconds: number): string {
   return `${seconds} s`;
 }
 
-function WidgetBody({ instance }: { instance: WidgetInstance }) {
+function WidgetBody({ instance, name }: { instance: WidgetInstance; name: string }) {
   const { data, error, loading, updatedAt, reload } = useWidgetData(
     instance.id,
     instance.refreshRate,
@@ -31,7 +37,14 @@ function WidgetBody({ instance }: { instance: WidgetInstance }) {
 
   return (
     <>
-      <CardContent className="flex flex-1 flex-col gap-3">
+      {/* The card has the height of its cells: a longer content scrolls inside. */}
+      {/* Focusable so that a long content can be scrolled with the keyboard. */}
+      <CardContent
+        tabIndex={0}
+        role="region"
+        aria-label={`${name} content`}
+        className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto rounded-md outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+      >
         {loading ? (
           <div className="flex flex-col gap-2" aria-label="Loading">
             <Skeleton className="h-4 w-1/2" />
@@ -69,26 +82,43 @@ export function WidgetCard({
   instance,
   service,
   widget,
+  size,
   onSaved,
   onDeleted,
 }: {
   instance: WidgetInstance;
   service: ServiceSummary | undefined;
   widget: WidgetSummary | undefined;
+  size: WidgetSize;
   onSaved: (widget: WidgetInstance) => void;
   onDeleted: (id: string) => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } =
-    useSortable({ id: instance.id });
+  // The card itself never moves: a copy follows the pointer, the swap happens on drop.
+  const {
+    attributes,
+    listeners,
+    setNodeRef: setDragRef,
+    setActivatorNodeRef,
+    isDragging,
+  } = useDraggable({ id: instance.id });
+  const { setNodeRef: setDropRef, isOver } = useDroppable({ id: instance.id });
   const name = widget?.name ?? "Unknown widget";
+  const isTarget = isOver && !isDragging;
 
   return (
     <Card
-      ref={setNodeRef}
-      style={{ transform: CSS.Transform.toString(transform), transition }}
-      className={cn("flex flex-col gap-4", isDragging && "z-10 opacity-80 shadow-lg")}
+      ref={(node) => {
+        setDragRef(node);
+        setDropRef(node);
+      }}
+      className={cn(
+        "flex min-h-0 flex-col gap-4 overflow-hidden transition-[opacity,box-shadow]",
+        SIZE_CLASSES[size],
+        isDragging && "opacity-40",
+        isTarget && "ring-2 ring-primary ring-offset-2 ring-offset-background",
+      )}
     >
       <CardHeader className="flex flex-row items-start gap-2">
         <Button
@@ -99,6 +129,8 @@ export function WidgetCard({
           aria-label={`Move ${name}`}
           {...attributes}
           {...listeners}
+          // Mouse and touch only: dragging a widget has no keyboard support.
+          tabIndex={-1}
         >
           <GripVertical aria-hidden />
         </Button>
@@ -117,7 +149,7 @@ export function WidgetCard({
       </CardHeader>
 
       {widget ? (
-        <WidgetBody instance={instance} />
+        <WidgetBody instance={instance} name={name} />
       ) : (
         <CardContent>
           <p className="text-sm text-muted-foreground">This widget is no longer available.</p>

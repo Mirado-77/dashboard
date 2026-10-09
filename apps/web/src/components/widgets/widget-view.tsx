@@ -6,6 +6,9 @@ import {
   type OpenIssuesData,
   type OpenPullRequestsData,
 } from "./github-repo";
+import { CalendarEvents, type CalendarEvent } from "./calendar-events";
+import { CryptoHistory, type PriceHistoryData } from "./crypto-history";
+import { CryptoPrice, type PairPriceData } from "./crypto-price";
 import { RssArticleList, RssLatestArticle, type ArticleListData, type LatestArticleData } from "./rss-articles";
 import { WeatherForecast, type ForecastData } from "./weather-forecast";
 import { WeatherTemperature, type CityTemperatureData } from "./weather-temperature";
@@ -35,6 +38,14 @@ export function WidgetView({
       return <GitHubOpenIssues data={data as OpenIssuesData} />;
     case "github/open_pull_requests":
       return <GitHubOpenPullRequests data={data as OpenPullRequestsData} />;
+    case "google-calendar/upcoming_events":
+      return <CalendarEvents data={data as CalendarEvent[]} showDay />;
+    case "google-calendar/today_events":
+      return <CalendarEvents data={data as CalendarEvent[]} showDay={false} />;
+    case "crypto/pair_price":
+      return <CryptoPrice data={data as PairPriceData} />;
+    case "crypto/price_history":
+      return <CryptoHistory data={data as PriceHistoryData} />;
     default:
       return <p className="text-sm text-muted-foreground">This widget has no display yet.</p>;
   }

@@ -9,7 +9,13 @@ import {
 } from './credentials.service.js';
 import { ServiceRegistry } from './registry/registry.js';
 import type { Service, Widget } from './registry/types.js';
-import { credentialsToStore, providerOf } from './subscriptions.rules.js';
+import {
+  assertSubscribable,
+  credentialsToStore,
+  hasGrantedScopes,
+  providerOf,
+} from './subscriptions.rules.js';
+import { parseScopes } from '../auth/custom/oauth/tokens.js';
 
 export type WidgetSummary = Pick<
   Widget,
@@ -26,22 +32,37 @@ export interface ServiceSummary {
   name: string;
   description: string;
   providerType: Service['providerType'];
+  oauthProviderId: string;
+  oauthScopes: string[];
   credentialFields: Service['credentialFields'];
   widgets: WidgetSummary[];
+  /** Always false for a service that needs no account: it has no subscription. */
   subscribed: boolean;
+  /** Its widgets can be added: available by default, or subscribed. */
+  available: boolean;
+  /** For an `oauth` service, the linked account granted every scope it needs. */
+  accessGranted: boolean;
+  hasCredentials: boolean;
+}
+
+interface SummaryState {
+  subscribed: boolean;
+  accessGranted: boolean;
   hasCredentials: boolean;
 }
 
 function toSummary(
   service: Service,
-  subscribed: boolean,
-  hasCredentials: boolean,
+  { subscribed, accessGranted, hasCredentials }: SummaryState,
 ): ServiceSummary {
+  const byDefault = service.providerType === 'none';
   return {
     id: service.id,
     name: service.name,
     description: service.description,
     providerType: service.providerType,
+    oauthProviderId: providerOf(service),
+    oauthScopes: service.oauthScopes ?? [],
     credentialFields: service.credentialFields,
     widgets: service.widgets.map((widget) => ({
       id: widget.id,
@@ -51,7 +72,9 @@ function toSummary(
       defaultRefreshRate: widget.defaultRefreshRate,
       minRefreshRate: widget.minRefreshRate,
     })),
-    subscribed,
+    subscribed: !byDefault && subscribed,
+    available: byDefault || subscribed,
+    accessGranted: service.providerType !== 'oauth' || accessGranted,
     hasCredentials,
   };
 }
@@ -82,15 +105,24 @@ export class SubscriptionsService {
       .where(eq(serviceSubscriptions.userId, userId));
     const byService = new Map(rows.map((row) => [row.serviceId, row]));
 
-    return this.registry
-      .getAll()
-      .map((service) =>
-        toSummary(
+    const linked = await this.db
+      .select({ providerId: accounts.providerId, scope: accounts.scope })
+      .from(accounts)
+      .where(eq(accounts.userId, userId));
+    const scopesByProvider = new Map(
+      linked.map((row) => [row.providerId, parseScopes(row.scope)]),
+    );
+
+    return this.registry.getAll().map((service) =>
+      toSummary(service, {
+        subscribed: byService.has(service.id),
+        accessGranted: hasGrantedScopes(
           service,
-          byService.has(service.id),
-          byService.get(service.id)?.credentials != null,
+          scopesByProvider.get(providerOf(service)) ?? null,
         ),
-      );
+        hasCredentials: byService.get(service.id)?.credentials != null,
+      }),
+    );
   }
 
   async subscribe(
@@ -99,10 +131,11 @@ export class SubscriptionsService {
     body: unknown,
   ): Promise<ServiceSummary> {
     const service = this.service(serviceId);
+    assertSubscribable(service);
     const credentials = credentialsToStore(
       service,
       body,
-      await this.hasLinkedAccount(userId, service),
+      await this.linkedScopes(userId, service),
     );
 
     await this.db
@@ -121,11 +154,15 @@ export class SubscriptionsService {
         },
       });
 
-    return toSummary(service, true, credentials !== null);
+    return toSummary(service, {
+      subscribed: true,
+      accessGranted: true,
+      hasCredentials: credentials !== null,
+    });
   }
 
   async unsubscribe(userId: string, serviceId: string): Promise<void> {
-    this.service(serviceId);
+    assertSubscribable(this.service(serviceId));
     await this.db
       .delete(serviceSubscriptions)
       .where(
@@ -152,13 +189,13 @@ export class SubscriptionsService {
     return row?.credentials ? this.cipher.decrypt(row.credentials) : null;
   }
 
-  private async hasLinkedAccount(
+  private async linkedScopes(
     userId: string,
     service: Service,
-  ): Promise<boolean> {
-    if (service.providerType !== 'oauth') return false;
+  ): Promise<string[] | null> {
+    if (service.providerType !== 'oauth') return null;
     const [row] = await this.db
-      .select({ id: accounts.id })
+      .select({ scope: accounts.scope })
       .from(accounts)
       .where(
         and(
@@ -166,6 +203,10 @@ export class SubscriptionsService {
           eq(accounts.providerId, providerOf(service)),
         ),
       );
-    return row !== undefined;
+    if (!row) {
+      return null;
+    }
+
+    return parseScopes(row.scope);
   }
 }

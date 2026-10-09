@@ -4,21 +4,29 @@ import { listServices } from "@/lib/services/server";
 
 export const metadata: Metadata = { title: "Services" };
 
-export default async function ServicesPage() {
-  const services = await listServices();
+export default async function ServicesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
+  const [services, { subscribe }] = await Promise.all([listServices(), searchParams]);
 
   return (
-    <main className="mx-auto flex w-full max-w-2xl flex-col gap-6 p-6">
+    <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 p-4 md:p-6">
       <div>
         <h1 className="text-xl font-semibold">Services</h1>
-        <p className="text-sm text-foreground/70">
-          Subscribe to a service to use its widgets on your dashboard.
+        <p className="text-sm text-muted-foreground">
+          Each service brings its widgets. Most are ready to use; connect the others once.
         </p>
       </div>
       {services.length === 0 ? (
         <p className="text-sm text-muted-foreground">No service is available yet.</p>
       ) : (
-        services.map((service) => <ServiceCard key={service.id} service={service} />)
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {services.map((service) => (
+            <ServiceCard key={service.id} service={service} autoSubscribe={subscribe === service.id} />
+          ))}
+        </div>
       )}
     </main>
   );

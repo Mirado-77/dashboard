@@ -1,9 +1,9 @@
 /*
-** EPITECH PROJECT, 2026
-** G-WEB-500-PAR-5-1-dashboard-10
-** File description:
-** ttl-cache
-*/
+ ** EPITECH PROJECT, 2026
+ ** G-WEB-500-PAR-5-1-dashboard-10
+ ** File description:
+ ** ttl-cache
+ */
 
 interface Entry<T> {
   value: T;
@@ -25,7 +25,11 @@ export class TtlCache<T> {
     private readonly now = () => Date.now(),
   ) {}
 
-  async get(key: string, ttlSeconds: number, load: () => Promise<T>): Promise<T> {
+  async get(
+    key: string,
+    ttlSeconds: number,
+    load: () => Promise<T>,
+  ): Promise<T> {
     const hit = this.entries.get(key);
     if (hit && hit.expiresAt > this.now()) return hit.value;
 

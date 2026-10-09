@@ -1,0 +1,1 @@
+ALTER TABLE "widget_instance" ALTER COLUMN "subscription_id" DROP NOT NULL;

@@ -1,9 +1,9 @@
 /*
-** EPITECH PROJECT, 2026
-** G-WEB-500-PAR-5-1-dashboard-10
-** File description:
-** safe-fetch
-*/
+ ** EPITECH PROJECT, 2026
+ ** G-WEB-500-PAR-5-1-dashboard-10
+ ** File description:
+ ** safe-fetch
+ */
 
 import { lookup } from 'node:dns/promises';
 import { BlockList } from 'node:net';

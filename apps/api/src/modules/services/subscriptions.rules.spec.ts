@@ -26,25 +26,56 @@ const jira = service({
 
 describe('credentialsToStore', () => {
   it('stores nothing for a service that needs no account', () => {
-    expect(credentialsToStore(free, undefined, false)).toBeNull();
-    expect(credentialsToStore(free, { any: 'thing' }, false)).toBeNull();
+    expect(credentialsToStore(free, undefined, null)).toBeNull();
+    expect(credentialsToStore(free, { any: 'thing' }, null)).toBeNull();
   });
 
   it('stores nothing for an oauth service, the token stays in account', () => {
-    expect(credentialsToStore(github, undefined, true)).toBeNull();
+    expect(credentialsToStore(github, undefined, [])).toBeNull();
   });
 
   it('refuses an oauth service when the provider is not linked', () => {
-    expect(() => credentialsToStore(github, undefined, false)).toThrow(
+    expect(() => credentialsToStore(github, undefined, null)).toThrow(
       /link your github account/i,
     );
+  });
+
+  describe('with scopes to grant', () => {
+    const calendar = service({
+      id: 'google-calendar',
+      name: 'Google Calendar',
+      providerType: 'oauth',
+      oauthProviderId: 'google',
+      oauthScopes: ['calendar.readonly'],
+    });
+
+    it('refuses a linked account that did not grant them', () => {
+      expect(() =>
+        credentialsToStore(calendar, undefined, ['openid', 'email']),
+      ).toThrow(
+        expect.objectContaining({
+          response: expect.objectContaining({
+            code: 'PROVIDER_SCOPE_MISSING',
+          }),
+        }),
+      );
+    });
+
+    it('accepts a linked account that granted them', () => {
+      expect(
+        credentialsToStore(calendar, undefined, [
+          'openid',
+          'calendar.readonly',
+        ]),
+      ).toBeNull();
+    });
   });
 
   it('keeps the declared fields of a credentials service', () => {
     const credentials = credentialsToStore(
       jira,
       { email: ' rick@citadel.io ', apiToken: 'secret-token' },
-      false,
+      null,
     );
 
     expect(credentials).toEqual({
@@ -55,27 +86,23 @@ describe('credentialsToStore', () => {
 
   it('refuses a missing, empty or unknown field', () => {
     expect(() =>
-      credentialsToStore(jira, { email: 'rick@citadel.io' }, false),
+      credentialsToStore(jira, { email: 'rick@citadel.io' }, null),
     ).toThrow();
     expect(() =>
-      credentialsToStore(
-        jira,
-        { email: '  ', apiToken: 'secret-token' },
-        false,
-      ),
+      credentialsToStore(jira, { email: '  ', apiToken: 'secret-token' }, null),
     ).toThrow();
     expect(() =>
       credentialsToStore(
         jira,
         { email: 'rick@citadel.io', apiToken: 'secret-token', role: 'admin' },
-        false,
+        null,
       ),
     ).toThrow();
   });
 
   it('names the expected fields without echoing what was sent', () => {
     try {
-      credentialsToStore(jira, { apiToken: 'secret-token' }, false);
+      credentialsToStore(jira, { apiToken: 'secret-token' }, null);
       throw new Error('should have thrown');
     } catch (error) {
       const message = JSON.stringify(
