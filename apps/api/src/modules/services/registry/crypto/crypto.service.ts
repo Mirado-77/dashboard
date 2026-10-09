@@ -11,13 +11,13 @@ function pairOf(config: WidgetContext['config']) {
 export const cryptoMarkets: Service = {
   id: 'crypto',
   name: 'Crypto markets',
-  description: 'Crypto markets',
+  description: 'Prices of crypto pairs, from Binance',
   providerType: 'none',
   widgets: [
     {
       id: 'pair_price',
       name: 'Pair price',
-      description: 'Pair price of a currency',
+      description: 'Current price of a pair, with its 24h change',
       params: [
         { name: 'base', type: 'string', required: true },
         { name: 'quote', type: 'string', required: false, defaultValue: 'EUR' },
