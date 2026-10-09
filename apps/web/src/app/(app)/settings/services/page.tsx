@@ -12,20 +12,21 @@ export default async function ServicesPage({
   const [services, { subscribe }] = await Promise.all([listServices(), searchParams]);
 
   return (
-    <main className="mx-auto flex w-full max-w-2xl flex-col gap-6 p-6">
+    <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 p-4 md:p-6">
       <div>
         <h1 className="text-xl font-semibold">Services</h1>
-        <p className="text-sm text-foreground/70">
-          Services without an account are available by default. Subscribe to the others to
-          use their widgets on your dashboard.
+        <p className="text-sm text-muted-foreground">
+          Each service brings its widgets. Most are ready to use; connect the others once.
         </p>
       </div>
       {services.length === 0 ? (
         <p className="text-sm text-muted-foreground">No service is available yet.</p>
       ) : (
-        services.map((service) => (
-          <ServiceCard key={service.id} service={service} autoSubscribe={subscribe === service.id} />
-        ))
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {services.map((service) => (
+            <ServiceCard key={service.id} service={service} autoSubscribe={subscribe === service.id} />
+          ))}
+        </div>
       )}
     </main>
   );

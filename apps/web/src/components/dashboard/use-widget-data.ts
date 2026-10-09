@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { widgetsClient } from "@/lib/widgets/client";
+import { REFRESH_ALL_WIDGETS } from "@/lib/widgets/events";
 
 interface WidgetDataState {
   /** The configuration the data belongs to. */
@@ -44,6 +45,11 @@ export function useWidgetData(id: string, refreshRate: number, version: string) 
   }, [id, refreshRate, version, manual]);
 
   const reload = useCallback(() => setManual((count) => count + 1), []);
+
+  useEffect(() => {
+    window.addEventListener(REFRESH_ALL_WIDGETS, reload);
+    return () => window.removeEventListener(REFRESH_ALL_WIDGETS, reload);
+  }, [reload]);
   const current = state?.version === version ? state : null;
 
   return {
