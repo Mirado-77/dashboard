@@ -32,13 +32,14 @@ export function CryptoHistory({ data }: { data: PriceHistoryData }) {
   const last = points[points.length - 1].close;
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex min-h-0 flex-1 flex-col gap-3">
       <div>
         <p className="text-sm text-muted-foreground">{data.pair}</p>
         <p className="text-2xl font-semibold tabular-nums">{formatPrice(last)}</p>
         <ChangeBadge percent={((last - first) / first) * 100} period={`${points.length} days`} />
       </div>
-      <ChartContainer config={chartConfig} className="aspect-auto h-40 w-full">
+      {/* Fills the card, but keeps a readable height in a preview. */}
+      <ChartContainer config={chartConfig} className="aspect-auto min-h-40 w-full flex-1">
         <AreaChart data={points} margin={{ left: 0, right: 0, top: 4, bottom: 0 }}>
           <CartesianGrid vertical={false} />
           <XAxis
