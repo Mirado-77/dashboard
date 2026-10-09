@@ -11,6 +11,12 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
 
   return (
     <div className="flex flex-1 flex-col">
+      <a
+        href="#content"
+        className="sr-only z-50 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground focus:not-sr-only focus:fixed focus:top-2 focus:left-2"
+      >
+        Skip to content
+      </a>
       <header className="sticky top-0 z-40 flex h-14 items-center justify-between gap-3 border-b bg-background px-4 md:px-6">
         <MobileNav isAdmin={isAdmin} />
         <MainNav isAdmin={isAdmin} className="hidden md:flex" />
@@ -20,7 +26,9 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
           <UserMenu user={user} />
         </div>
       </header>
-      {children}
+      <div id="content" tabIndex={-1} className="flex flex-1 flex-col outline-none">
+        {children}
+      </div>
     </div>
   );
 }

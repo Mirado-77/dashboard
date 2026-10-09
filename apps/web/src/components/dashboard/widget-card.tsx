@@ -28,7 +28,7 @@ function formatRate(seconds: number): string {
   return `${seconds} s`;
 }
 
-function WidgetBody({ instance }: { instance: WidgetInstance }) {
+function WidgetBody({ instance, name }: { instance: WidgetInstance; name: string }) {
   const { data, error, loading, updatedAt, reload } = useWidgetData(
     instance.id,
     instance.refreshRate,
@@ -38,7 +38,13 @@ function WidgetBody({ instance }: { instance: WidgetInstance }) {
   return (
     <>
       {/* The card has the height of its cells: a longer content scrolls inside. */}
-      <CardContent className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto">
+      {/* Focusable so that a long content can be scrolled with the keyboard. */}
+      <CardContent
+        tabIndex={0}
+        role="region"
+        aria-label={`${name} content`}
+        className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto rounded-md outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+      >
         {loading ? (
           <div className="flex flex-col gap-2" aria-label="Loading">
             <Skeleton className="h-4 w-1/2" />
@@ -123,6 +129,8 @@ export function WidgetCard({
           aria-label={`Move ${name}`}
           {...attributes}
           {...listeners}
+          // Mouse and touch only: dragging a widget has no keyboard support.
+          tabIndex={-1}
         >
           <GripVertical aria-hidden />
         </Button>
@@ -141,7 +149,7 @@ export function WidgetCard({
       </CardHeader>
 
       {widget ? (
-        <WidgetBody instance={instance} />
+        <WidgetBody instance={instance} name={name} />
       ) : (
         <CardContent>
           <p className="text-sm text-muted-foreground">This widget is no longer available.</p>

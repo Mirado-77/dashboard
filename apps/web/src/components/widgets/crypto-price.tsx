@@ -30,7 +30,7 @@ export function ChangeBadge({ percent, period }: { percent: number; period: stri
     <span
       className={cn(
         "flex items-center gap-1 text-sm font-medium tabular-nums",
-        up ? "text-emerald-600 dark:text-emerald-400" : "text-destructive",
+        up ? "text-emerald-800 dark:text-emerald-400" : "text-destructive",
       )}
     >
       <Icon className="size-4" aria-hidden />
