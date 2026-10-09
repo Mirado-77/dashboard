@@ -21,7 +21,6 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
-  CommandSeparator,
   CommandShortcut,
 } from "@/components/ui/command";
 import { servicesClient } from "@/lib/services/client";
@@ -137,9 +136,8 @@ export function CommandMenu({ isAdmin }: { isAdmin: boolean }) {
             )}
           </CommandGroup>
 
-          <CommandSeparator />
 
-          <CommandGroup heading="Go to">
+          <CommandGroup heading="Go to" className="border-t">
             {pages.map(({ href, label, icon: Icon }) => (
               <CommandItem key={href} value={`go ${label}`} onSelect={() => run(() => router.push(href))}>
                 <Icon aria-hidden />
@@ -148,9 +146,8 @@ export function CommandMenu({ isAdmin }: { isAdmin: boolean }) {
             ))}
           </CommandGroup>
 
-          <CommandSeparator />
 
-          <CommandGroup heading="Actions">
+          <CommandGroup heading="Actions" className="border-t">
             <CommandItem value="refresh all widgets" onSelect={() => run(refreshAll)}>
               <RefreshCw aria-hidden />
               Refresh all widgets
