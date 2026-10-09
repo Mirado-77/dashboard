@@ -7,6 +7,7 @@ import { ServiceRegistry } from '../services/registry/registry.js';
 import type { Service, WidgetContext } from '../services/registry/types.js';
 import { Errors } from '../auth/custom/errors.js';
 import { WidgetsService } from './widgets.service.js';
+import { DATA_LIMIT } from './widgets.service.js';
 
 let getWidgetData: (ctx: WidgetContext) => Promise<unknown>;
 
@@ -371,6 +372,21 @@ describe('WidgetsService.data', () => {
     });
     expect(tokenCalls).toEqual([['user-1', github]]);
   });
+
+  it('refuses more refreshes than the limit, per user', async () => {
+  const { widgets } = setup({ owned: [row] });
+
+  for (let i = 0; i < DATA_LIMIT.max; i += 1) {
+    await widgets.data('user-1', 'w-1');
+  }
+
+  await expect(widgets.data('user-1', 'w-1')).rejects.toMatchObject({
+    status: 429,
+    response: { code: 'TOO_MANY_REQUESTS' },
+  });
+  await expect(widgets.data('user-2', 'w-1')).resolves.toBeDefined();
+});
+
 
   it('asks to link the account when there is no token', async () => {
     let called = false;
