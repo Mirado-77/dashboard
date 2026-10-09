@@ -18,7 +18,15 @@ function socialProviders(config: ConfigService<Env, true>): OAuthProvider[] {
   const githubId = config.get('GITHUB_CLIENT_ID', { infer: true });
   const githubSecret = config.get('GITHUB_CLIENT_SECRET', { infer: true });
   if (githubId && githubSecret) {
-    providers.push(github({ clientId: githubId, clientSecret: githubSecret }));
+    providers.push(
+      github({
+        clientId: githubId,
+        clientSecret: githubSecret,
+        // `repo` lets the widgets read private repositories.
+        scopes: ['read:user', 'user:email', 'repo'],
+    }),
+);
+
   }
   const googleId = config.get('GOOGLE_CLIENT_ID', { infer: true });
   const googleSecret = config.get('GOOGLE_CLIENT_SECRET', { infer: true });

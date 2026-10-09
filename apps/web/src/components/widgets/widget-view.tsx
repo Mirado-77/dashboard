@@ -1,3 +1,11 @@
+import {
+  GitHubCommits,
+  GitHubOpenIssues,
+  GitHubOpenPullRequests,
+  type CommitsData,
+  type OpenIssuesData,
+  type OpenPullRequestsData,
+} from "./github-repo";
 import { CalendarEvents, type CalendarEvent } from "./calendar-events";
 import { CryptoHistory, type PriceHistoryData } from "./crypto-history";
 import { CryptoPrice, type PairPriceData } from "./crypto-price";
@@ -24,6 +32,12 @@ export function WidgetView({
       return <RssArticleList data={data as ArticleListData} />;
     case "rss/latest_article":
       return <RssLatestArticle data={data as LatestArticleData} />;
+    case "github/last_commits":
+      return <GitHubCommits data={data as CommitsData} />;
+    case "github/open_issues":
+      return <GitHubOpenIssues data={data as OpenIssuesData} />;
+    case "github/open_pull_requests":
+      return <GitHubOpenPullRequests data={data as OpenPullRequestsData} />;
     case "google-calendar/upcoming_events":
       return <CalendarEvents data={data as CalendarEvent[]} showDay />;
     case "google-calendar/today_events":
