@@ -7,7 +7,7 @@ import {
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
-import { and, asc, eq, gt, max, sql } from 'drizzle-orm';
+import { and, asc, eq, gt, max, sql, count } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { DATABASE, type Database } from '../../database/database.module.js';
@@ -54,6 +54,7 @@ const widgetUpdateSchema = z.object({
 
 /** A full dashboard reloads in one burst, so this is per minute, not per second. */
 export const DATA_LIMIT = { window: 60, max: 300 };
+export const MAX_WIDGETS = 50;
 
 @Injectable()
 export class WidgetsService {
@@ -166,9 +167,20 @@ export class WidgetsService {
     const refreshRate = refreshRateFor(widget, input.refreshRate);
 
     const [last] = await this.db
-      .select({ position: max(widgetInstances.position) })
+      .select({
+        position: max(widgetInstances.position),
+        total: count(),
+      })
       .from(widgetInstances)
       .where(eq(widgetInstances.userId, userId));
+
+    if ((last?.total ?? 0) >= MAX_WIDGETS) {
+      throw new BadRequestException({
+        code: 'TOO_MANY_WIDGETS',
+        message: `A dashboard holds ${MAX_WIDGETS} widgets at most`,
+      });
+    }
+
 
     const [created] = await this.db
       .insert(widgetInstances)
