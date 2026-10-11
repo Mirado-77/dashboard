@@ -7,7 +7,7 @@ import {
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
-import { and, asc, eq, gt, max, sql } from 'drizzle-orm';
+import { and, asc, eq, gt, max, sql, count } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { DATABASE, type Database } from '../../database/database.module.js';
@@ -26,6 +26,8 @@ import type {
 import { configFor, moveTo, refreshRateFor } from './widgets.rules.js';
 import { TtlCache } from '../../common/ttl-cache.js';
 import { AuthError } from '../auth/custom/errors.js';
+import { memoryRateLimiter } from '../auth/custom/rate-limit.js';
+import { HttpException, HttpStatus } from '@nestjs/common';
 
 function cacheKey(
   scope: string,
@@ -50,10 +52,15 @@ const widgetUpdateSchema = z.object({
   position: z.int().min(0).optional(),
 });
 
+/** A full dashboard reloads in one burst, so this is per minute, not per second. */
+export const DATA_LIMIT = { window: 60, max: 300 };
+export const MAX_WIDGETS = 50;
+
 @Injectable()
 export class WidgetsService {
   private readonly logger = new Logger(WidgetsService.name);
   private readonly cache = new TtlCache<unknown>();
+  private readonly limiter = memoryRateLimiter();
 
   constructor(
     @Inject(DATABASE) private readonly db: Database,
@@ -160,9 +167,20 @@ export class WidgetsService {
     const refreshRate = refreshRateFor(widget, input.refreshRate);
 
     const [last] = await this.db
-      .select({ position: max(widgetInstances.position) })
+      .select({
+        position: max(widgetInstances.position),
+        total: count(),
+      })
       .from(widgetInstances)
       .where(eq(widgetInstances.userId, userId));
+
+    if ((last?.total ?? 0) >= MAX_WIDGETS) {
+      throw new BadRequestException({
+        code: 'TOO_MANY_WIDGETS',
+        message: `A dashboard holds ${MAX_WIDGETS} widgets at most`,
+      });
+    }
+
 
     const [created] = await this.db
       .insert(widgetInstances)
@@ -262,6 +280,16 @@ export class WidgetsService {
   }
 
   async data(userId: string, id: string): Promise<{ data: unknown }> {
+     const wait = this.limiter.consume(`data:${userId}`, DATA_LIMIT);
+    if (wait !== null) {
+      throw new HttpException(
+        {
+          code: 'TOO_MANY_REQUESTS',
+          message: `Too many refreshes, retry in ${wait} seconds`,
+        },
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+  }
     const row = await this.instance(userId, id);
     const widget = this.widget(row.serviceId, row.widgetId);
     const config = configFor(widget, row.config);

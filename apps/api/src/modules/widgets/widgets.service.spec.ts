@@ -6,7 +6,7 @@ import { WidgetDataError } from '../services/registry/errors.js';
 import { ServiceRegistry } from '../services/registry/registry.js';
 import type { Service, WidgetContext } from '../services/registry/types.js';
 import { Errors } from '../auth/custom/errors.js';
-import { WidgetsService } from './widgets.service.js';
+import { DATA_LIMIT, MAX_WIDGETS, WidgetsService } from './widgets.service.js';
 
 let getWidgetData: (ctx: WidgetContext) => Promise<unknown>;
 
@@ -58,6 +58,8 @@ interface State {
   subscribed?: boolean;
   /** Highest position among the user's widgets, null when there is none. */
   lastPosition?: number | null;
+  /** How many widgets the user already has. */
+  widgetCount?: number;
   /** Rows the user owns, as the filtered queries would return them. */
   owned?: Record<string, unknown>[];
   /** The whole dashboard in order, when it differs from `owned`. */
@@ -71,6 +73,7 @@ interface State {
 function setup({
   subscribed = true,
   lastPosition = null,
+  widgetCount = 0,
   owned = [],
   ordered = owned,
   token = null,
@@ -100,7 +103,7 @@ function setup({
               ? [{ id: 'sub-1' }]
               : []
             : fields && 'position' in fields
-              ? [{ position: lastPosition }]
+              ? [{ position: lastPosition, total: widgetCount }]
               : owned;
         return Object.assign(Promise.resolve(rows), {
           orderBy: async () => ordered,
@@ -227,6 +230,42 @@ describe('WidgetsService.create', () => {
       response: { code: 'NOT_SUBSCRIBED' },
     });
     expect(inserted).toHaveLength(0);
+  });
+
+  it('accepts the last widget a dashboard can hold', async () => {
+    const { widgets, inserted } = setup({
+      lastPosition: MAX_WIDGETS - 2,
+      widgetCount: MAX_WIDGETS - 1,
+    });
+
+    await widgets.create('user-1', valid);
+
+    expect(inserted).toHaveLength(1);
+  });
+
+  it('refuses a widget once the dashboard is full', async () => {
+    const { widgets, inserted } = setup({
+      lastPosition: MAX_WIDGETS - 1,
+      widgetCount: MAX_WIDGETS,
+    });
+
+    await expect(widgets.create('user-1', valid)).rejects.toMatchObject({
+      status: 400,
+      response: { code: 'TOO_MANY_WIDGETS' },
+    });
+    expect(inserted).toHaveLength(0);
+  });
+
+  it('counts the widgets, not the highest position', async () => {
+    // Unsubscribing from a service leaves gaps in the positions.
+    const { widgets, inserted } = setup({
+      lastPosition: MAX_WIDGETS + 10,
+      widgetCount: 3,
+    });
+
+    await widgets.create('user-1', valid);
+
+    expect(inserted).toHaveLength(1);
   });
 });
 
@@ -370,6 +409,20 @@ describe('WidgetsService.data', () => {
       data: { calledWith: 'gh-token' },
     });
     expect(tokenCalls).toEqual([['user-1', github]]);
+  });
+
+  it('refuses more refreshes than the limit, per user', async () => {
+    const { widgets } = setup({ owned: [row] });
+
+    for (let i = 0; i < DATA_LIMIT.max; i += 1) {
+      await widgets.data('user-1', 'w-1');
+    }
+
+    await expect(widgets.data('user-1', 'w-1')).rejects.toMatchObject({
+      status: 429,
+      response: { code: 'TOO_MANY_REQUESTS' },
+    });
+    await expect(widgets.data('user-2', 'w-1')).resolves.toBeDefined();
   });
 
   it('asks to link the account when there is no token', async () => {
