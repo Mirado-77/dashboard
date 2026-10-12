@@ -3,14 +3,12 @@ import { defineEndpoint } from '../endpoint.js';
 import { Errors } from '../errors.js';
 import { CREDENTIAL_PROVIDER } from '../context.js';
 import { assertPasswordLength } from './email-password.js';
+import { callbackURL, email, password, token } from './schemas.js';
 
 export const requestPasswordReset = defineEndpoint({
   method: 'POST',
   path: '/request-password-reset',
-  body: z.object({
-    email: z.email().trim().toLowerCase(),
-    callbackURL: z.string().optional(),
-  }),
+  body: z.strictObject({ email, callbackURL }),
   async handler({ body, auth, json }) {
     auth.assertCallbackURL(body.callbackURL);
     const user = await auth.store.users.findByEmail(body.email);
@@ -33,10 +31,7 @@ export const requestPasswordReset = defineEndpoint({
 export const resetPassword = defineEndpoint({
   method: 'POST',
   path: '/reset-password',
-  body: z.object({
-    token: z.string(),
-    newPassword: z.string(),
-  }),
+  body: z.strictObject({ token, newPassword: password }),
   async handler({ body, auth, json }) {
     const token = body.token;
     if (!token) throw Errors.invalidToken();

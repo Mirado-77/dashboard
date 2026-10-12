@@ -1,14 +1,12 @@
 import { z } from 'zod';
 import { defineEndpoint } from '../endpoint.js';
 import { AuthError, Errors } from '../errors.js';
+import { callbackURL, email } from './schemas.js';
 
 export const sendVerificationEmail = defineEndpoint({
   method: 'POST',
   path: '/send-verification-email',
-  body: z.object({
-    email: z.email().trim().toLowerCase(),
-    callbackURL: z.string().optional(),
-  }),
+  body: z.strictObject({ email, callbackURL }),
   async handler({ body, auth, json }) {
     auth.assertCallbackURL(body.callbackURL);
     const user = await auth.store.users.findByEmail(body.email);

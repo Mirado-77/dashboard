@@ -188,6 +188,25 @@ describe('WidgetsService.create', () => {
     );
   });
 
+  it('rejects a field the API does not expect', async () => {
+    const { widgets } = setup({});
+
+    await expect(
+      widgets.create('user-1', { ...valid, userId: 'user-2' }),
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  it('rejects an empty or oversized service id', async () => {
+    const { widgets } = setup({});
+
+    await expect(
+      widgets.create('user-1', { ...valid, serviceId: ' ' }),
+    ).rejects.toThrow(BadRequestException);
+    await expect(
+      widgets.create('user-1', { ...valid, serviceId: 'x'.repeat(101) }),
+    ).rejects.toThrow(BadRequestException);
+  });
+
   it('rejects an unknown widget', async () => {
     const { widgets } = setup({});
 
@@ -313,6 +332,24 @@ describe('WidgetsService.update', () => {
 
     await expect(
       widgets.update('user-1', 'w-1', { position: -1 }),
+    ).rejects.toThrow(BadRequestException);
+    expect(updates).toHaveLength(0);
+  });
+
+  it('rejects a position past the last place of a full dashboard', async () => {
+    const { widgets, updates } = setup({ owned: [row] });
+
+    await expect(
+      widgets.update('user-1', 'w-1', { position: MAX_WIDGETS }),
+    ).rejects.toThrow(BadRequestException);
+    expect(updates).toHaveLength(0);
+  });
+
+  it('rejects a field that cannot be updated', async () => {
+    const { widgets, updates } = setup({ owned: [row] });
+
+    await expect(
+      widgets.update('user-1', 'w-1', { serviceId: 'github' }),
     ).rejects.toThrow(BadRequestException);
     expect(updates).toHaveLength(0);
   });

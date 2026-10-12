@@ -7,6 +7,7 @@ import { defineEndpoint, type EndpointContext } from '../endpoint.js';
 import { AuthError, Errors } from '../errors.js';
 import type { OAuthProvider, OAuthUserInfo } from '../oauth/provider.js';
 import { encryptTokens, parseScopes } from '../oauth/tokens.js';
+import { callbackURL, providerId } from './schemas.js';
 
 const STATE_COOKIE = 'oauth_state';
 const STATE_TTL = 10 * 60;
@@ -34,10 +35,10 @@ function redirectURI(auth: AuthContext, provider: OAuthProvider) {
   return `${auth.options.baseURL.replace(/\/$/, '')}/callback/${provider.id}`;
 }
 
-const flowBody = z.object({
-  provider: z.string().min(1),
-  callbackURL: z.string().optional(),
-  errorCallbackURL: z.string().optional(),
+const flowBody = z.strictObject({
+  provider: providerId,
+  callbackURL,
+  errorCallbackURL: callbackURL,
   scopes: z
     .array(z.string().regex(/^[\w:./-]+$/))
     .max(20)
@@ -354,7 +355,7 @@ export const listAccounts = defineEndpoint({
 export const unlinkAccount = defineEndpoint({
   method: 'POST',
   path: '/unlink-account',
-  body: z.object({ providerId: z.string().min(1) }),
+  body: z.strictObject({ providerId }),
   async handler({ auth, body, json, requireSession }) {
     const { user } = await requireSession();
     const accounts = await auth.store.accounts.listByUser(user.id);

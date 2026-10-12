@@ -3,8 +3,7 @@ import { CREDENTIAL_PROVIDER, type AuthContext } from '../context.js';
 import { generateId } from '../crypto.js';
 import { AuthError, Errors } from '../errors.js';
 import { defineEndpoint } from '../endpoint.js';
-
-const email = z.email().trim().toLowerCase();
+import { callbackURL, email, password } from './schemas.js';
 
 // Hash compared when the user does not exist, so both paths take the same time.
 let dummyHash: Promise<string> | undefined;
@@ -32,11 +31,11 @@ export function assertPasswordLength(auth: AuthContext, password: string) {
 export const signUpEmail = defineEndpoint({
   method: 'POST',
   path: '/sign-up/email',
-  body: z.object({
+  body: z.strictObject({
     name: z.string().trim().min(1).max(100),
     email,
-    password: z.string(),
-    callbackURL: z.string().optional(),
+    password,
+    callbackURL,
   }),
   async handler({ body, auth, request, json, responseHeaders }) {
     assertPasswordLength(auth, body.password);
@@ -92,11 +91,11 @@ export const signUpEmail = defineEndpoint({
 export const signInEmail = defineEndpoint({
   method: 'POST',
   path: '/sign-in/email',
-  body: z.object({
+  body: z.strictObject({
     email,
-    password: z.string().max(1024),
+    password,
     rememberMe: z.boolean().optional(),
-    callbackURL: z.string().optional(),
+    callbackURL,
   }),
   async handler({ body, auth, request, json, responseHeaders }) {
     auth.assertCallbackURL(body.callbackURL);

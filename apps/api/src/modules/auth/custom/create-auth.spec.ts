@@ -61,6 +61,7 @@ const credentials = {
   email: 'Rick@Citadel.io',
   password: 'wubbalubba',
 };
+const login = { email: credentials.email, password: credentials.password };
 
 async function signUpAndVerify(auth: AuthInstance, mails: { url: string }[]) {
   await post(auth, '/sign-up/email', credentials);
@@ -95,10 +96,51 @@ describe('createAuth', () => {
     expect((await short.json()).code).toBe('PASSWORD_TOO_SHORT');
   });
 
+  it('trims the email before checking it', async () => {
+    const { auth } = setup();
+    const response = await post(auth, '/sign-up/email', {
+      ...credentials,
+      email: '  Rick@Citadel.io ',
+    });
+
+    expect(response.status).toBe(200);
+    expect((await response.json()).user.email).toBe('rick@citadel.io');
+  });
+
+  it('rejects an email longer than 254 characters', async () => {
+    const { auth, mails } = setup();
+    const response = await post(auth, '/sign-up/email', {
+      ...credentials,
+      email: `${'a'.repeat(250)}@b.io`,
+    });
+
+    expect(response.status).toBe(400);
+    expect(mails).toHaveLength(0);
+  });
+
+  it('rejects a field the endpoint does not expect', async () => {
+    const { auth } = setup();
+    const response = await post(auth, '/sign-up/email', {
+      ...credentials,
+      role: 'admin',
+    });
+
+    expect(response.status).toBe(400);
+  });
+
+  it('rejects an oversized password before hashing it', async () => {
+    const { auth } = setup();
+    const response = await post(auth, '/sign-in/email', {
+      ...login,
+      password: 'x'.repeat(1025),
+    });
+    expect(response.status).toBe(400);
+  });
+
   it('refuses sign in until the email is verified', async () => {
     const { auth } = setup();
     await post(auth, '/sign-up/email', credentials);
-    const response = await post(auth, '/sign-in/email', credentials);
+    const response = await post(auth, '/sign-in/email', login);
 
     expect(response.status).toBe(403);
     expect((await response.json()).code).toBe('EMAIL_NOT_VERIFIED');
@@ -110,7 +152,7 @@ describe('createAuth', () => {
     expect(verified.status).toBe(200);
     expect(verified.headers.getSetCookie()[0]).toMatch(/HttpOnly/);
 
-    const signIn = await post(auth, '/sign-in/email', credentials);
+    const signIn = await post(auth, '/sign-in/email', login);
     expect(signIn.status).toBe(200);
     const cookie = cookieOf(signIn);
 
@@ -128,11 +170,11 @@ describe('createAuth', () => {
     await signUpAndVerify(auth, mails);
 
     const wrong = await post(auth, '/sign-in/email', {
-      ...credentials,
+      ...login,
       password: 'nope-nope',
     });
     const unknown = await post(auth, '/sign-in/email', {
-      ...credentials,
+      ...login,
       email: 'morty@citadel.io',
     });
     expect(wrong.status).toBe(401);
@@ -142,7 +184,7 @@ describe('createAuth', () => {
   it('signs out and invalidates the session', async () => {
     const { auth, mails } = setup();
     await signUpAndVerify(auth, mails);
-    const cookie = cookieOf(await post(auth, '/sign-in/email', credentials));
+    const cookie = cookieOf(await post(auth, '/sign-in/email', login));
 
     const out = await post(auth, '/sign-out', undefined, { cookie });
     expect(out.status).toBe(200);
@@ -184,7 +226,7 @@ describe('createAuth', () => {
     });
     const statuses: number[] = [];
     for (let i = 0; i < 3; i++) {
-      statuses.push((await post(auth, '/sign-in/email', credentials)).status);
+      statuses.push((await post(auth, '/sign-in/email', login)).status);
     }
     expect(statuses).toEqual([401, 401, 429]);
   });
@@ -222,7 +264,7 @@ describe('createAuth', () => {
   it('updates the name of the caller only', async () => {
     const { auth, mails } = setup();
     await signUpAndVerify(auth, mails);
-    const cookie = cookieOf(await post(auth, '/sign-in/email', credentials));
+    const cookie = cookieOf(await post(auth, '/sign-in/email', login));
 
     const response = await post(
       auth,
@@ -242,7 +284,7 @@ describe('createAuth', () => {
   it('rejects a name update without session or with an empty name', async () => {
     const { auth, mails } = setup();
     await signUpAndVerify(auth, mails);
-    const cookie = cookieOf(await post(auth, '/sign-in/email', credentials));
+    const cookie = cookieOf(await post(auth, '/sign-in/email', login));
 
     expect((await post(auth, '/update-user', { name: 'Morty' })).status).toBe(
       401,
@@ -255,7 +297,7 @@ describe('createAuth', () => {
   it('changes the password and signs in with the new one', async () => {
     const { auth, mails } = setup();
     await signUpAndVerify(auth, mails);
-    const cookie = cookieOf(await post(auth, '/sign-in/email', credentials));
+    const cookie = cookieOf(await post(auth, '/sign-in/email', login));
     const newPassword = 'pickle-rick-99';
 
     const response = await post(
@@ -266,11 +308,11 @@ describe('createAuth', () => {
     );
     expect(response.status).toBe(200);
 
-    expect((await post(auth, '/sign-in/email', credentials)).status).toBe(401);
+    expect((await post(auth, '/sign-in/email', login)).status).toBe(401);
     expect(
       (
         await post(auth, '/sign-in/email', {
-          ...credentials,
+          ...login,
           password: newPassword,
         })
       ).status,
@@ -280,7 +322,7 @@ describe('createAuth', () => {
   it('refuses a wrong current password and a too short new one', async () => {
     const { auth, mails } = setup();
     await signUpAndVerify(auth, mails);
-    const cookie = cookieOf(await post(auth, '/sign-in/email', credentials));
+    const cookie = cookieOf(await post(auth, '/sign-in/email', login));
 
     const wrong = await post(
       auth,
@@ -300,7 +342,7 @@ describe('createAuth', () => {
     expect((await short.json()).code).toBe('PASSWORD_TOO_SHORT');
 
     // The password still works, nothing was changed.
-    expect((await post(auth, '/sign-in/email', credentials)).status).toBe(200);
+    expect((await post(auth, '/sign-in/email', login)).status).toBe(200);
   });
 
   it('requires a session to change the password', async () => {
@@ -317,10 +359,8 @@ describe('createAuth', () => {
   it('revokes the other sessions but keeps the caller signed in', async () => {
     const { auth, mails } = setup();
     await signUpAndVerify(auth, mails);
-    const otherDevice = cookieOf(
-      await post(auth, '/sign-in/email', credentials),
-    );
-    const cookie = cookieOf(await post(auth, '/sign-in/email', credentials));
+    const otherDevice = cookieOf(await post(auth, '/sign-in/email', login));
+    const cookie = cookieOf(await post(auth, '/sign-in/email', login));
 
     const response = await post(
       auth,
@@ -351,10 +391,8 @@ describe('createAuth', () => {
   it('keeps the other sessions when the option is not set', async () => {
     const { auth, mails } = setup();
     await signUpAndVerify(auth, mails);
-    const otherDevice = cookieOf(
-      await post(auth, '/sign-in/email', credentials),
-    );
-    const cookie = cookieOf(await post(auth, '/sign-in/email', credentials));
+    const otherDevice = cookieOf(await post(auth, '/sign-in/email', login));
+    const cookie = cookieOf(await post(auth, '/sign-in/email', login));
 
     await post(
       auth,
@@ -413,7 +451,7 @@ describe('createAuth', () => {
   it('resets the password, burns the token and revokes every session', async () => {
     const { auth, mails, resets } = setup();
     await signUpAndVerify(auth, mails);
-    const cookie = cookieOf(await post(auth, '/sign-in/email', credentials));
+    const cookie = cookieOf(await post(auth, '/sign-in/email', login));
     await post(auth, '/request-password-reset', {
       email: credentials.email,
       callbackURL: '/reset-password',
@@ -426,11 +464,11 @@ describe('createAuth', () => {
     });
     expect(response.status).toBe(200);
 
-    expect((await post(auth, '/sign-in/email', credentials)).status).toBe(401);
+    expect((await post(auth, '/sign-in/email', login)).status).toBe(401);
     expect(
       (
         await post(auth, '/sign-in/email', {
-          ...credentials,
+          ...login,
           password: newPassword,
         })
       ).status,
@@ -468,7 +506,7 @@ describe('createAuth', () => {
     expect((await short.json()).code).toBe('PASSWORD_TOO_SHORT');
 
     // Nothing changed, the old password still works.
-    expect((await post(auth, '/sign-in/email', credentials)).status).toBe(200);
+    expect((await post(auth, '/sign-in/email', login)).status).toBe(200);
   });
 
   it('does not accept an email verification token to reset a password', async () => {
@@ -480,9 +518,7 @@ describe('createAuth', () => {
       newPassword: 'pickle-rick-99',
     });
     expect(response.status).toBe(400);
-    expect((await post(auth, '/sign-in/email', credentials)).status).not.toBe(
-      200,
-    );
+    expect((await post(auth, '/sign-in/email', login)).status).not.toBe(200);
   });
 
   it('returns 404 for unknown routes', async () => {

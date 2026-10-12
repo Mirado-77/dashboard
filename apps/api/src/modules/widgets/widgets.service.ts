@@ -39,22 +39,29 @@ function cacheKey(
   )}`;
 }
 
-const widgetBodySchema = z.object({
-  serviceId: z.string().trim(),
-  widgetId: z.string().trim(),
+export const MAX_WIDGETS = 50;
+
+const catalogId = z.string().trim().min(1).max(100);
+
+const widgetBodySchema = z.strictObject({
+  serviceId: catalogId,
+  widgetId: catalogId,
   config: z.record(z.string(), z.unknown()),
   refreshRate: z.int().optional(),
 });
 
-const widgetUpdateSchema = z.object({
+const widgetUpdateSchema = z.strictObject({
   config: z.record(z.string(), z.unknown()).optional(),
   refreshRate: z.int().optional(),
-  position: z.int().min(0).optional(),
+  position: z
+    .int()
+    .min(0)
+    .max(MAX_WIDGETS - 1)
+    .optional(),
 });
 
 /** A full dashboard reloads in one burst, so this is per minute, not per second. */
 export const DATA_LIMIT = { window: 60, max: 300 };
-export const MAX_WIDGETS = 50;
 
 @Injectable()
 export class WidgetsService {
@@ -181,7 +188,6 @@ export class WidgetsService {
       });
     }
 
-
     const [created] = await this.db
       .insert(widgetInstances)
       .values({
@@ -280,7 +286,7 @@ export class WidgetsService {
   }
 
   async data(userId: string, id: string): Promise<{ data: unknown }> {
-     const wait = this.limiter.consume(`data:${userId}`, DATA_LIMIT);
+    const wait = this.limiter.consume(`data:${userId}`, DATA_LIMIT);
     if (wait !== null) {
       throw new HttpException(
         {
@@ -289,7 +295,7 @@ export class WidgetsService {
         },
         HttpStatus.TOO_MANY_REQUESTS,
       );
-  }
+    }
     const row = await this.instance(userId, id);
     const widget = this.widget(row.serviceId, row.widgetId);
     const config = configFor(widget, row.config);

@@ -17,7 +17,7 @@ async function requireAdmin(
   return session;
 }
 
-const targetBody = z.object({ userId: z.string().min(1) });
+const targetBody = z.strictObject({ userId: z.string().min(1).max(100) });
 
 /** Refuses actions an admin could use to lock themselves out. */
 function assertNotSelf(session: AuthSession, userId: string) {
@@ -59,7 +59,7 @@ export function admin(options: AdminOptions = {}): AuthPlugin {
         async handler(ctx) {
           await requireAdmin(ctx);
           const query = z
-            .object({
+            .strictObject({
               search: z.string().trim().max(100).optional(),
               limit: z.coerce.number().int().min(1).max(100).default(20),
               offset: z.coerce.number().int().min(0).default(0),

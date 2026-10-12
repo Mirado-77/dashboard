@@ -3,11 +3,12 @@ import { defineEndpoint } from '../endpoint.js';
 import { Errors } from '../errors.js';
 import { CREDENTIAL_PROVIDER } from '../context.js';
 import { assertPasswordLength } from './email-password.js';
+import { password } from './schemas.js';
 
 export const updateUser = defineEndpoint({
   method: 'POST',
   path: '/update-user',
-  body: z.object({
+  body: z.strictObject({
     name: z.string().trim().min(1).max(100),
   }),
   async handler({ body, auth, json, requireSession }) {
@@ -21,9 +22,9 @@ export const updateUser = defineEndpoint({
 export const updatePassword = defineEndpoint({
   method: 'POST',
   path: '/update-password',
-  body: z.object({
-    currentPassword: z.string(),
-    newPassword: z.string(),
+  body: z.strictObject({
+    currentPassword: password,
+    newPassword: password,
     revokeOtherSessions: z.boolean().optional(),
   }),
   async handler({ body, auth, json, requireSession }) {
